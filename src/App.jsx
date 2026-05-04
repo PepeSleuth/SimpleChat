@@ -47,6 +47,7 @@ export default function App() {
   const [modelPickerInput, setModelPickerInput] = useState('');
 
   const chatRef = useRef(null);
+  const abortRef = useRef(null);
 
   const currentConv = conversations.find(c => c.id === currentConversationId);
   const messages = currentConv?.messages ?? [];
@@ -125,6 +126,10 @@ export default function App() {
     }
   }
 
+  function stopStreaming() {
+    abortRef.current?.abort();
+  }
+
   async function sendMessage() {
     const text = inputText.trim();
     if (!text || isStreaming) return;
@@ -140,11 +145,15 @@ export default function App() {
     setStreamingText('');
     setError('');
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
       const openrouter = createOpenRouter({ apiKey });
       const result = streamText({
         model: openrouter(model),
         messages: updatedMessages,
+        abortSignal: controller.signal,
       });
 
       let fullText = '';
@@ -162,8 +171,9 @@ export default function App() {
         )
       );
     } catch (err) {
-      setError(err.message || 'Unknown error');
+      if (err.name !== 'AbortError') setError(err.message || 'Unknown error');
     } finally {
+      abortRef.current = null;
       setStreamingText('');
       setIsStreaming(false);
     }
@@ -285,8 +295,8 @@ export default function App() {
             onKeyDown={handleKeyDown}
             disabled={isStreaming}
           />
-          <button id="send-btn" onClick={sendMessage} disabled={isStreaming}>
-            {isStreaming ? '...' : 'Send'}
+          <button id="send-btn" onClick={isStreaming ? stopStreaming : sendMessage}>
+            {isStreaming ? 'Stop' : 'Send'}
           </button>
         </div>
       </div>
