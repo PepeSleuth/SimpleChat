@@ -90,26 +90,22 @@ export default function App() {
     }
   }
 
-  function renameConversation() {
-    const newName = prompt('Enter new conversation name:', currentConv.name);
-    if (newName && newName.trim() && newName.trim() !== currentConv.name) {
+  function renameConversation(conv) {
+    const newName = prompt('Enter new conversation name:', conv.name);
+    if (newName && newName.trim() && newName.trim() !== conv.name) {
       setConversations(prev =>
-        prev.map(c => c.id === currentConversationId ? { ...c, name: newName.trim() } : c)
+        prev.map(c => c.id === conv.id ? { ...c, name: newName.trim() } : c)
       );
     }
   }
 
-  function deleteConversation() {
+  function deleteConversation(conv) {
     if (conversations.length <= 1) { alert('Cannot delete the last conversation'); return; }
-    if (confirm(`Delete "${currentConv.name}"?`)) {
-      const remaining = conversations.filter(c => c.id !== currentConversationId);
+    if (confirm(`Delete "${conv.name}"?`)) {
+      const remaining = conversations.filter(c => c.id !== conv.id);
       setConversations(remaining);
-      setCurrentConversationId(remaining[0].id);
+      if (currentConversationId === conv.id) setCurrentConversationId(remaining[0].id);
     }
-  }
-
-  function switchConversation(e) {
-    setCurrentConversationId(parseInt(e.target.value));
   }
 
   function branchConversation(messageIndex) {
@@ -173,8 +169,8 @@ export default function App() {
 
   if (!configured) {
     return (
-      <>
-        <header><h1>SimpleChat</h1></header>
+      <div id="setup-page">
+        <h1>SimpleChat</h1>
         <div id="api-key-section">
           <h3>API key:</h3>
           <p>Get one from <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">OpenRouter</a>.</p>
@@ -194,72 +190,100 @@ export default function App() {
           />
           <button onClick={saveConfig}>Save</button>
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      <header><h1>SimpleChat</h1></header>
+    <div id="app-layout">
+      <aside id="sidebar">
+        <div id="sidebar-header">
+          <h1>SimpleChat</h1>
+          <button id="new-conv-btn" onClick={newConversation} title="New conversation">+</button>
+        </div>
 
-      <div id="conversation-controls">
-        <button onClick={newConversation}>New Conversation</button>
-        <select
-          id="conversation-list"
-          value={currentConversationId}
-          onChange={switchConversation}
-        >
+        <nav id="conv-list">
           {conversations.map(conv => (
-            <option key={conv.id} value={conv.id}>{conv.name}</option>
+            <div
+              key={conv.id}
+              className={`conv-item${conv.id === currentConversationId ? ' active' : ''}`}
+              onClick={() => setCurrentConversationId(conv.id)}
+            >
+              <span className="conv-name">{conv.name}</span>
+              <span className="conv-actions">
+                <button
+                  className="conv-action-btn"
+                  title="Rename"
+                  onClick={e => { e.stopPropagation(); renameConversation(conv); }}
+                >✎</button>
+                <button
+                  className="conv-action-btn delete"
+                  title="Delete"
+                  disabled={conversations.length <= 1}
+                  onClick={e => { e.stopPropagation(); deleteConversation(conv); }}
+                >✕</button>
+              </span>
+            </div>
           ))}
-        </select>
-        <button onClick={renameConversation}>Rename</button>
-        <button id="delete-btn" onClick={deleteConversation} disabled={conversations.length <= 1}>
-          Delete
-        </button>
+        </nav>
+
+        <div id="sidebar-footer">
+          <span id="model-label" title={model}>{model}</span>
+          <button id="change-model-btn" onClick={changeModel}>Change model</button>
+        </div>
+      </aside>
+
+      <div id="main">
+        <div id="chat" ref={chatRef}>
+          {messages.length === 0 && !isStreaming && (
+            <div id="empty-state">Start a conversation</div>
+          )}
+
+          {messages.map((msg, i) => (
+            <div key={i} className={`message ${msg.role}`}>
+              <div className="message-label">{msg.role === 'user' ? 'You' : 'AI'}</div>
+              <div className="message-content">
+                {msg.content}
+                {msg.role === 'assistant' && (
+                  <button className="branch-btn" onClick={() => branchConversation(i)}>
+                    Branch
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {isStreaming && (
+            <div className="message assistant">
+              <div className="message-label">AI</div>
+              <div className="message-content">
+                {streamingText}<span className="streaming"></span>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="message error-msg">
+              <span className="error">Error: {error}</span>
+            </div>
+          )}
+        </div>
+
+        <div id="input-row">
+          <input
+            type="text"
+            id="input"
+            placeholder="Type your message here"
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isStreaming}
+          />
+          <button id="send-btn" onClick={sendMessage} disabled={isStreaming}>
+            {isStreaming ? '...' : 'Send'}
+          </button>
+        </div>
       </div>
-
-      <p>Model: <strong>{model}</strong> <button onClick={changeModel}>Change</button></p>
-
-      <div id="chat" ref={chatRef}>
-        {messages.map((msg, i) => (
-          <div key={i} className="message">
-            <span className={msg.role}>{msg.role === 'user' ? 'You' : 'AI'}:</span>{' '}
-            {msg.content}
-            {msg.role === 'assistant' && (
-              <button className="branch-btn" onClick={() => branchConversation(i)}>
-                Branch
-              </button>
-            )}
-          </div>
-        ))}
-
-        {isStreaming && (
-          <div className="message">
-            <span className="assistant">AI:</span>{' '}
-            {streamingText}<span className="streaming"></span>
-          </div>
-        )}
-
-        {error && (
-          <div className="message">
-            <span className="error">Error: {error}</span>
-          </div>
-        )}
-      </div>
-
-      <input
-        type="text"
-        id="input"
-        placeholder="Type your message here"
-        value={inputText}
-        onChange={e => setInputText(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={isStreaming}
-      />
-      <button id="send-btn" onClick={sendMessage} disabled={isStreaming}>
-        {isStreaming ? 'Thinking...' : 'Send'}
-      </button>
-    </>
+    </div>
   );
 }
