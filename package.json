@@ -6,13 +6,15 @@
     "build": "vite build"
   },
   "dependencies": {
-    "ai": "latest",
     "@openrouter/ai-sdk-provider": "latest",
+    "ai": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
-    "vite": "latest",
-    "@vitejs/plugin-react": "latest"
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest"
   }
 }
