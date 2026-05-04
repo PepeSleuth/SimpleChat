@@ -4,6 +4,9 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import modelsRaw from '../data/models.txt?raw';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 const MODEL_LIST = modelsRaw.split('\n').map(l => l.trim()).filter(Boolean);
 
@@ -281,7 +284,7 @@ export default function App() {
               <div className="message-label">{msg.role === 'user' ? 'You' : 'AI'}</div>
               <div className="message-content">
                 {msg.role === 'assistant' ? (
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.content}</ReactMarkdown>
                 ) : msg.content}
                 {msg.role === 'assistant' && (
                   <button className="branch-btn" onClick={() => branchConversation(i)}>
@@ -296,7 +299,7 @@ export default function App() {
             <div className="message assistant">
               <div className="message-label">AI</div>
               <div className="message-content">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingText}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{streamingText}</ReactMarkdown>
                 <span className="streaming"></span>
               </div>
             </div>
