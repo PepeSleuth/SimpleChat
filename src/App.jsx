@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { streamText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import modelsRaw from '../data/models.txt?raw';
+
+const MODEL_LIST = modelsRaw.split('\n').map(l => l.trim()).filter(Boolean);
 
 const LS = {
   get: (k, fallback) => {
@@ -40,6 +43,8 @@ export default function App() {
   const [streamingText, setStreamingText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState('');
+  const [showModelPicker, setShowModelPicker] = useState(false);
+  const [modelPickerInput, setModelPickerInput] = useState('');
 
   const chatRef = useRef(null);
 
@@ -69,15 +74,16 @@ export default function App() {
   }
 
   function changeModel() {
-    const newModel = prompt('Enter new model name:', model);
-    if (newModel && newModel.trim()) {
-      const m = newModel.trim();
-      LS.setRaw('model', m);
-      setModel(m);
-      setConversations(prev =>
-        prev.map(c => c.id === currentConversationId ? { ...c, messages: [] } : c)
-      );
-    }
+    setModelPickerInput('');
+    setShowModelPicker(true);
+  }
+
+  function selectModel(m) {
+    m = m.trim();
+    if (!m) return;
+    LS.setRaw('model', m);
+    setModel(m);
+    setShowModelPicker(false);
   }
 
   function newConversation() {
@@ -284,6 +290,35 @@ export default function App() {
           </button>
         </div>
       </div>
+      {showModelPicker && (
+        <div id="model-picker-overlay" onClick={() => setShowModelPicker(false)}>
+          <div id="model-picker" onClick={e => e.stopPropagation()}>
+            <h3>Pick a model</h3>
+            <div id="model-picker-list">
+              {MODEL_LIST.map(m => (
+                <div
+                  key={m}
+                  className={`model-option${m === model ? ' selected' : ''}`}
+                  onClick={() => selectModel(m)}
+                >
+                  {m}
+                </div>
+              ))}
+            </div>
+            <div id="model-picker-custom">
+              <input
+                type="text"
+                placeholder="Or type a custom model…"
+                value={modelPickerInput}
+                onChange={e => setModelPickerInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') selectModel(modelPickerInput); }}
+                autoFocus
+              />
+              <button onClick={() => selectModel(modelPickerInput)}>Use</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
