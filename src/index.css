@@ -198,6 +198,47 @@ body {
   background: #333;
 }
 
+#reasoning-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+#reasoning-label {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#reasoning-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.reasoning-btn {
+  flex: 1;
+  padding: 4px 0;
+  font-size: 12px;
+  background: transparent;
+  color: #555;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.reasoning-btn:hover {
+  border-color: #999;
+  color: #000;
+}
+
+.reasoning-btn.active {
+  background: #000;
+  color: #fff;
+  border-color: #000;
+}
+
 /* ── Main chat area ──────────────────────────────────────── */
 
 #main {

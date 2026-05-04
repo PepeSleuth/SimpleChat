@@ -45,6 +45,7 @@ export default function App() {
   const [error, setError] = useState('');
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [modelPickerInput, setModelPickerInput] = useState('');
+  const [reasoningEffort, setReasoningEffort] = useState(() => LS.getRaw('reasoning-effort') || null);
 
   const chatRef = useRef(null);
   const abortRef = useRef(null);
@@ -150,8 +151,9 @@ export default function App() {
 
     try {
       const openrouter = createOpenRouter({ apiKey });
+      const modelOptions = reasoningEffort ? { extraBody: { reasoning: { effort: reasoningEffort } } } : {};
       const result = streamText({
-        model: openrouter(model),
+        model: openrouter(model, modelOptions),
         messages: updatedMessages,
         abortSignal: controller.signal,
       });
@@ -246,6 +248,23 @@ export default function App() {
         <div id="sidebar-footer">
           <span id="model-label" title={model}>{model}</span>
           <button id="change-model-btn" onClick={changeModel}>Change model</button>
+          <div id="reasoning-row">
+            <span id="reasoning-label">Reasoning</span>
+            <div id="reasoning-btns">
+              {[null, 'low', 'medium', 'high'].map(level => (
+                <button
+                  key={level ?? 'off'}
+                  className={`reasoning-btn${reasoningEffort === level ? ' active' : ''}`}
+                  onClick={() => {
+                    setReasoningEffort(level);
+                    level ? LS.setRaw('reasoning-effort', level) : localStorage.removeItem('reasoning-effort');
+                  }}
+                >
+                  {level ?? 'off'}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </aside>
 
