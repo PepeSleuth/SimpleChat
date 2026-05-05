@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { streamText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import modelsRaw from '../data/models.txt?raw';
@@ -7,8 +7,61 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import {
+  appendMessage,
+  createConversation,
+  deleteConversation as deleteConversationRecord,
+  duplicateConversationFromMessages,
+  loadAppState,
+  loadConversationMessages,
+  renameConversation as renameConversationRecord,
+  setSetting,
+} from './chatDb';
 
 const MODEL_LIST = modelsRaw.split('\n').map(l => l.trim()).filter(Boolean);
+const DEFAULT_MODEL = 'meta-llama/llama-3.2-1b-instruct';
+
+function isImageMimeType(mimeType = '') {
+  return mimeType.startsWith('image/');
+}
+
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error || new Error('Failed to read attachment'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function createAttachmentPreview(attachment) {
+  return {
+    ...attachment,
+    previewUrl: attachment.kind === 'image' ? URL.createObjectURL(attachment.blob) : null,
+  };
+}
+
+function hydrateMessages(rawMessages = []) {
+  return rawMessages.map(message => ({
+    ...message,
+    attachments: (message.attachments ?? []).map(createAttachmentPreview),
+  }));
+}
+
+function releaseAttachmentUrls(messages = []) {
+  for (const message of messages) {
+    for (const attachment of message.attachments ?? []) {
+      if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
+    }
+  }
+}
 
 function formatCost(cost) {
   if (cost == null) return null;
@@ -22,7 +75,7 @@ function formatCost(cost) {
 function MessageStats({ stats }) {
   if (!stats) return null;
   const d = new Date(stats.date);
-  const date = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  const date = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   const costStr = formatCost(stats.cost);
   const parts = [
     <span key="model" title={stats.model}>{stats.model}</span>,
@@ -30,89 +83,228 @@ function MessageStats({ stats }) {
     ...(stats.totalTokens != null ? [
       <span key="tokens" title={`${stats.promptTokens} prompt + ${stats.completionTokens} completion`}>
         {stats.totalTokens} tokens
-      </span>
+      </span>,
     ] : []),
     ...(costStr ? [<span key="cost">{costStr}</span>] : []),
   ];
+
   return (
     <div className="message-stats">
       {parts.map((part, i) => (
-        <>
-          {i > 0 && <span key={`sep${i}`} className="stats-sep">|</span>}
+        <span key={i} className="message-stat-segment">
+          {i > 0 && <span className="stats-sep">|</span>}
           {part}
-        </>
+        </span>
       ))}
     </div>
   );
 }
 
-const LS = {
-  get: (k, fallback) => {
-    try {
-      const v = localStorage.getItem(k);
-      return v === null ? fallback : JSON.parse(v);
-    } catch {
-      return fallback;
-    }
-  },
-  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
-  getRaw: (k, fallback = '') => localStorage.getItem(k) ?? fallback,
-  setRaw: (k, v) => localStorage.setItem(k, v),
-};
+function MessageAttachments({ attachments = [], onRemove }) {
+  if (!attachments.length) return null;
 
-const defaultConversations = () => [{ id: 0, name: 'Conversation 1', messages: [] }];
+  return (
+    <div className="message-attachments">
+      {attachments.map(attachment => (
+        <div
+          key={attachment.id}
+          className={`attachment-chip${attachment.kind === 'image' ? ' image' : ''}`}
+          title={attachment.name}
+        >
+          {attachment.kind === 'image' ? (
+            <img src={attachment.previewUrl} alt={attachment.name} className="attachment-thumb" />
+          ) : (
+            <span className="attachment-icon">📎</span>
+          )}
+          <span className="attachment-meta">
+            <span className="attachment-name">{attachment.name}</span>
+            <span className="attachment-size">
+              {formatFileSize(attachment.size)}
+              {attachment.mimeType ? ` · ${attachment.mimeType}` : ''}
+            </span>
+          </span>
+          {onRemove && (
+            <button
+              type="button"
+              className="attachment-remove-btn"
+              onClick={() => onRemove(attachment.id)}
+              aria-label={`Remove ${attachment.name}`}
+            >
+              ×
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+async function attachmentToPart(attachment) {
+  const dataUrl = await blobToDataUrl(attachment.blob);
+
+  if (attachment.kind === 'image') {
+    return {
+      type: 'image',
+      image: dataUrl,
+      mediaType: attachment.mimeType,
+    };
+  }
+
+  return {
+    type: 'file',
+    data: dataUrl,
+    mediaType: attachment.mimeType,
+    filename: attachment.name,
+  };
+}
+
+async function messagesToModelMessages(messages) {
+  const modelMessages = [];
+
+  for (const message of messages) {
+    if (message.role === 'assistant') {
+      modelMessages.push({ role: 'assistant', content: message.text ?? '' });
+      continue;
+    }
+
+    const parts = [];
+    if (message.text) {
+      parts.push({ type: 'text', text: message.text });
+    }
+
+    const attachmentParts = await Promise.all((message.attachments ?? []).map(attachmentToPart));
+    parts.push(...attachmentParts);
+
+    modelMessages.push(
+      parts.length === 1 && parts[0].type === 'text'
+        ? { role: 'user', content: parts[0].text }
+        : { role: 'user', content: parts }
+    );
+  }
+
+  return modelMessages;
+}
+
+function makeDraftAttachment(file) {
+  const mimeType = file.type || 'application/octet-stream';
+  const kind = isImageMimeType(mimeType) ? 'image' : 'file';
+  return {
+    id: (crypto.randomUUID?.() ?? `${file.name}-${file.lastModified}-${file.size}-${Math.random().toString(36).slice(2)}`),
+    name: file.name,
+    size: file.size,
+    mimeType,
+    kind,
+    blob: file,
+    previewUrl: kind === 'image' ? URL.createObjectURL(file) : null,
+  };
+}
 
 export default function App() {
-  const [apiKey, setApiKey] = useState(() => LS.getRaw('api-key'));
-  const [model, setModel] = useState(() => LS.getRaw('model') || 'meta-llama/llama-3.2-1b-instruct');
-  const [configured, setConfigured] = useState(() => !!LS.getRaw('api-key'));
+  const [apiKey, setApiKey] = useState('');
+  const [model, setModel] = useState(DEFAULT_MODEL);
+  const [configured, setConfigured] = useState(false);
 
   const [apiKeyInput, setApiKeyInput] = useState('');
-  const [modelInput, setModelInput] = useState(() => LS.getRaw('model') || 'meta-llama/llama-3.2-1b-instruct');
+  const [modelInput, setModelInput] = useState(DEFAULT_MODEL);
 
-  const [conversations, setConversations] = useState(() =>
-    LS.get('conversations', null) ?? defaultConversations()
-  );
-  const [currentConversationId, setCurrentConversationId] = useState(() =>
-    LS.get('currentConversationId', 0)
-  );
-  const [nextConversationId, setNextConversationId] = useState(() =>
-    LS.get('nextConversationId', 1)
-  );
+  const [conversations, setConversations] = useState([]);
+  const [currentConversationId, setCurrentConversationId] = useState(null);
+  const [messages, setMessages] = useState([]);
 
   const [inputText, setInputText] = useState('');
+  const [pendingAttachments, setPendingAttachments] = useState([]);
   const [streamingText, setStreamingText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isConversationLoading, setIsConversationLoading] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [error, setError] = useState('');
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [modelPickerInput, setModelPickerInput] = useState('');
-  const [reasoningEffort, setReasoningEffort] = useState(() => LS.getRaw('reasoning-effort') || null);
+  const [reasoningEffort, setReasoningEffort] = useState(null);
+
   const chatRef = useRef(null);
   const abortRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const loadSeqRef = useRef(0);
+  const previousMessagesRef = useRef([]);
 
   const currentConv = conversations.find(c => c.id === currentConversationId);
-  const messages = currentConv?.messages ?? [];
 
-  // Persist conversations + ids
   useEffect(() => {
-    LS.set('conversations', conversations);
-    LS.set('currentConversationId', currentConversationId);
-    LS.set('nextConversationId', nextConversationId);
-  }, [conversations, currentConversationId, nextConversationId]);
+    let cancelled = false;
 
-  // Auto-scroll
+    (async () => {
+      try {
+        const state = await loadAppState();
+        if (cancelled) return;
+
+        const savedModel = state.settings.model || DEFAULT_MODEL;
+        setApiKey(state.settings.apiKey || '');
+        setApiKeyInput('');
+        setModel(savedModel);
+        setModelInput(savedModel);
+        setConfigured(Boolean(state.settings.apiKey));
+        setConversations(state.conversations);
+        setCurrentConversationId(state.currentConversationId);
+        setMessages(hydrateMessages(state.messages));
+        setReasoningEffort(state.settings.reasoningEffort ?? null);
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Failed to load chats');
+      } finally {
+        if (!cancelled) setIsBootstrapping(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const previousMessages = previousMessagesRef.current;
+    const nextUrls = new Set();
+
+    for (const message of messages) {
+      for (const attachment of message.attachments ?? []) {
+        if (attachment.previewUrl) nextUrls.add(attachment.previewUrl);
+      }
+    }
+
+    for (const message of previousMessages) {
+      for (const attachment of message.attachments ?? []) {
+        if (attachment.previewUrl && !nextUrls.has(attachment.previewUrl)) {
+          URL.revokeObjectURL(attachment.previewUrl);
+        }
+      }
+    }
+
+    previousMessagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => () => releaseAttachmentUrls(previousMessagesRef.current), []);
+
+  useEffect(() => {
+    if (currentConversationId != null) {
+      setSetting('currentConversationId', currentConversationId);
+    }
+  }, [currentConversationId]);
+
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [messages, streamingText]);
+  }, [messages, streamingText, isConversationLoading]);
 
   function saveConfig() {
-    if (!apiKeyInput.trim()) { alert('Enter an API key'); return; }
-    if (!modelInput.trim()) { alert('Enter a model name'); return; }
-    LS.setRaw('api-key', apiKeyInput.trim());
-    LS.setRaw('model', modelInput.trim());
-    setApiKey(apiKeyInput.trim());
-    setModel(modelInput.trim());
+    const nextApiKey = apiKeyInput.trim();
+    const nextModel = modelInput.trim();
+    if (!nextApiKey) { alert('Enter an API key'); return; }
+    if (!nextModel) { alert('Enter a model name'); return; }
+
+    setApiKey(nextApiKey);
+    setModel(nextModel);
     setConfigured(true);
+    setSetting('apiKey', nextApiKey);
+    setSetting('model', nextModel);
+    if (reasoningEffort !== null) setSetting('reasoningEffort', reasoningEffort);
   }
 
   function changeModel() {
@@ -120,50 +312,102 @@ export default function App() {
     setShowModelPicker(true);
   }
 
-  function selectModel(m) {
-    m = m.trim();
-    if (!m) return;
-    LS.setRaw('model', m);
-    setModel(m);
+  function selectModel(nextModel) {
+    const trimmed = nextModel.trim();
+    if (!trimmed) return;
+    setModel(trimmed);
+    setModelInput(trimmed);
+    setSetting('model', trimmed);
     setShowModelPicker(false);
   }
 
-  function newConversation() {
-    const name = prompt('Enter conversation name:', `Conversation ${nextConversationId + 1}`);
-    if (name && name.trim()) {
-      const newConv = { id: nextConversationId, name: name.trim(), messages: [] };
-      setConversations(prev => [...prev, newConv]);
-      setCurrentConversationId(nextConversationId);
-      setNextConversationId(n => n + 1);
+  async function openConversation(conversationId) {
+    if (conversationId == null || isStreaming || isConversationLoading) return;
+    const seq = ++loadSeqRef.current;
+    setIsConversationLoading(true);
+    setError('');
+
+    try {
+      const rawMessages = await loadConversationMessages(conversationId);
+      if (seq !== loadSeqRef.current) return;
+      setMessages(hydrateMessages(rawMessages));
+      setCurrentConversationId(conversationId);
+      await setSetting('currentConversationId', conversationId);
+    } catch (err) {
+      if (seq === loadSeqRef.current) setError(err.message || 'Failed to load conversation');
+    } finally {
+      if (seq === loadSeqRef.current) setIsConversationLoading(false);
     }
   }
 
-  function renameConversation(conv) {
+  async function newConversation() {
+    if (isStreaming || isConversationLoading) return;
+
+    const name = prompt('Enter conversation name:', `Conversation ${conversations.length + 1}`);
+    if (!name || !name.trim()) return;
+
+    try {
+      const conversation = await createConversation(name.trim());
+      setConversations(prev => [...prev, conversation]);
+      await openConversation(conversation.id);
+    } catch (err) {
+      setError(err.message || 'Failed to create conversation');
+    }
+  }
+
+  async function renameConversation(conv) {
     const newName = prompt('Enter new conversation name:', conv.name);
-    if (newName && newName.trim() && newName.trim() !== conv.name) {
-      setConversations(prev =>
-        prev.map(c => c.id === conv.id ? { ...c, name: newName.trim() } : c)
-      );
+    if (!newName || !newName.trim() || newName.trim() === conv.name) return;
+
+    try {
+      const updated = await renameConversationRecord(conv.id, newName.trim());
+      if (updated) {
+        setConversations(prev => prev.map(c => (c.id === conv.id ? updated : c)));
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to rename conversation');
     }
   }
 
-  function deleteConversation(conv) {
-    if (conversations.length <= 1) { alert('Cannot delete the last conversation'); return; }
-    if (confirm(`Delete "${conv.name}"?`)) {
+  async function deleteConversation(conv) {
+    if (conversations.length <= 1) {
+      alert('Cannot delete the last conversation');
+      return;
+    }
+
+    if (isStreaming) return;
+
+    if (!confirm(`Delete "${conv.name}"?`)) return;
+
+    try {
+      await deleteConversationRecord(conv.id);
       const remaining = conversations.filter(c => c.id !== conv.id);
       setConversations(remaining);
-      if (currentConversationId === conv.id) setCurrentConversationId(remaining[0].id);
+
+      if (currentConversationId === conv.id) {
+        await openConversation(remaining[0].id);
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to delete conversation');
     }
   }
 
-  function branchConversation(messageIndex) {
+  async function branchConversation(messageIndex) {
+    if (!currentConv || isStreaming || isConversationLoading) return;
+
     const branchMessages = messages.slice(0, messageIndex + 1);
     const branchName = prompt('Enter name for branched conversation:', `${currentConv.name} (Branch)`);
-    if (branchName && branchName.trim()) {
-      const newConv = { id: nextConversationId, name: branchName.trim(), messages: [...branchMessages] };
-      setConversations(prev => [...prev, newConv]);
-      setCurrentConversationId(nextConversationId);
-      setNextConversationId(n => n + 1);
+    if (!branchName || !branchName.trim()) return;
+
+    try {
+      const branch = await duplicateConversationFromMessages({
+        name: branchName.trim(),
+        messages: branchMessages,
+      });
+      setConversations(prev => [...prev, branch]);
+      await openConversation(branch.id);
+    } catch (err) {
+      setError(err.message || 'Failed to branch conversation');
     }
   }
 
@@ -171,35 +415,98 @@ export default function App() {
     abortRef.current?.abort();
   }
 
+  function addFiles(fileList) {
+    const files = Array.from(fileList ?? []);
+    if (!files.length) return;
+
+    const attachments = files.map(makeDraftAttachment);
+    setPendingAttachments(prev => [...prev, ...attachments]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function removePendingAttachment(id) {
+    setPendingAttachments(prev => {
+      const next = [];
+      for (const attachment of prev) {
+        if (attachment.id === id) {
+          if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
+          continue;
+        }
+        next.push(attachment);
+      }
+      return next;
+    });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function clearPendingAttachments() {
+    setPendingAttachments(prev => {
+      releaseAttachmentUrls([{ attachments: prev }]);
+      return [];
+    });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function consumePendingAttachments() {
+    setPendingAttachments([]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
   async function sendMessage() {
     const text = inputText.trim();
-    if (!text || isStreaming) return;
+    if (isStreaming || isConversationLoading) return;
+    if (currentConversationId == null) return;
+    if (!text && pendingAttachments.length === 0) return;
 
-    const userMsg = { role: 'user', content: text };
-    const updatedMessages = [...messages, userMsg];
+    const draftAttachments = pendingAttachments;
+    const draftMessages = messages;
 
-    setConversations(prev =>
-      prev.map(c => c.id === currentConversationId ? { ...c, messages: updatedMessages } : c)
-    );
-    setInputText('');
-    setIsStreaming(true);
-    setStreamingText('');
     setError('');
-
-    const controller = new AbortController();
-    abortRef.current = controller;
+    setStreamingText('');
+    setIsStreaming(true);
 
     try {
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      const userRecord = await appendMessage({
+        conversationId: currentConversationId,
+        role: 'user',
+        text,
+        attachments: draftAttachments.map(attachment => ({
+          name: attachment.name,
+          mimeType: attachment.mimeType,
+          size: attachment.size,
+          kind: attachment.kind,
+          blob: attachment.blob,
+        })),
+      });
+
+      const userMessage = {
+        id: userRecord.id,
+        role: 'user',
+        text,
+        createdAt: userRecord.createdAt,
+        attachments: draftAttachments.map(attachment => ({ ...attachment })),
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+
       const openrouter = createOpenRouter({ apiKey });
       const modelOptions = {
         usage: { include: true },
         ...(reasoningEffort ? { extraBody: { reasoning: { effort: reasoningEffort } } } : {}),
       };
+
+      const modelMessages = await messagesToModelMessages([...draftMessages, userMessage]);
       const result = streamText({
         model: openrouter(model, modelOptions),
-        messages: updatedMessages,
+        messages: modelMessages,
         abortSignal: controller.signal,
       });
+
+      consumePendingAttachments();
+      setInputText('');
 
       let fullText = '';
       for await (const chunk of result.textStream) {
@@ -210,9 +517,10 @@ export default function App() {
       const usage = await result.usage;
       const providerMeta = (await result.providerMetadata) ?? (await result.experimental_providerMetadata);
       const cost = providerMeta?.openrouter?.usage?.cost ?? null;
-      const assistantMsg = {
+      const assistantRecord = await appendMessage({
+        conversationId: currentConversationId,
         role: 'assistant',
-        content: fullText,
+        text: fullText,
         stats: {
           date: new Date().toISOString(),
           model,
@@ -221,16 +529,20 @@ export default function App() {
           totalTokens: usage?.totalTokens,
           cost,
         },
-      };
-      setConversations(prev =>
-        prev.map(c =>
-          c.id === currentConversationId
-            ? { ...c, messages: [...updatedMessages, assistantMsg] }
-            : c
-        )
-      );
+      });
+
+      setMessages(prev => [...prev, {
+        id: assistantRecord.id,
+        role: 'assistant',
+        text: fullText,
+        stats: assistantRecord.stats,
+        createdAt: assistantRecord.createdAt,
+        attachments: [],
+      }]);
     } catch (err) {
-      if (err.name !== 'AbortError') setError(err.message || 'Unknown error');
+      if (err.name !== 'AbortError') {
+        setError(err.message || 'Unknown error');
+      }
     } finally {
       abortRef.current = null;
       setStreamingText('');
@@ -240,6 +552,15 @@ export default function App() {
 
   function handleKeyDown(e) {
     if (e.key === 'Enter') sendMessage();
+  }
+
+  if (isBootstrapping) {
+    return (
+      <div id="loading-page">
+        <h1>SimpleChat</h1>
+        <p>Loading chats...</p>
+      </div>
+    );
   }
 
   if (!configured) {
@@ -265,6 +586,7 @@ export default function App() {
           />
           <button onClick={saveConfig}>Save</button>
         </div>
+        {error && <div className="error">Error: {error}</div>}
       </div>
     );
   }
@@ -282,7 +604,7 @@ export default function App() {
             <div
               key={conv.id}
               className={`conv-item${conv.id === currentConversationId ? ' active' : ''}`}
-              onClick={() => setCurrentConversationId(conv.id)}
+              onClick={() => openConversation(conv.id)}
             >
               <span className="conv-name">{conv.name}</span>
               <span className="conv-actions">
@@ -314,7 +636,7 @@ export default function App() {
                   className={`reasoning-btn${reasoningEffort === level ? ' active' : ''}`}
                   onClick={() => {
                     setReasoningEffort(level);
-                    level ? LS.setRaw('reasoning-effort', level) : localStorage.removeItem('reasoning-effort');
+                    setSetting('reasoningEffort', level);
                   }}
                 >
                   {level ?? 'off'}
@@ -327,17 +649,22 @@ export default function App() {
 
       <div id="main">
         <div id="chat" ref={chatRef}>
-          {messages.length === 0 && !isStreaming && (
+          {messages.length === 0 && !isStreaming && !isConversationLoading && (
             <div id="empty-state">Start a conversation</div>
           )}
 
           {messages.map((msg, i) => (
-            <div key={i} className={`message ${msg.role}`}>
+            <div key={msg.id ?? i} className={`message ${msg.role}`}>
               <div className="message-label">{msg.role === 'user' ? 'You' : 'AI'}</div>
               <div className="message-content">
                 {msg.role === 'assistant' ? (
-                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.content}</ReactMarkdown>
-                ) : msg.content}
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.text}</ReactMarkdown>
+                ) : (
+                  <>
+                    {msg.text && <div className="message-text">{msg.text}</div>}
+                    <MessageAttachments attachments={msg.attachments} />
+                  </>
+                )}
                 {msg.role === 'assistant' && (
                   <>
                     <MessageStats stats={msg.stats} />
@@ -350,12 +677,16 @@ export default function App() {
             </div>
           ))}
 
-          {isStreaming && (
+          {(isStreaming || isConversationLoading) && (
             <div className="message assistant">
               <div className="message-label">AI</div>
               <div className="message-content">
-                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{streamingText}</ReactMarkdown>
-                <span className="streaming"></span>
+                {isConversationLoading ? 'Loading conversation...' : (
+                  <>
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{streamingText}</ReactMarkdown>
+                    <span className="streaming"></span>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -367,7 +698,30 @@ export default function App() {
           )}
         </div>
 
+        {pendingAttachments.length > 0 && (
+          <div id="attachment-draft">
+            <div id="attachment-draft-header">
+              <span>Attachments</span>
+              <button type="button" id="clear-attachments-btn" onClick={clearPendingAttachments}>
+                Clear all
+              </button>
+            </div>
+            <MessageAttachments attachments={pendingAttachments} onRemove={removePendingAttachment} />
+          </div>
+        )}
+
         <div id="input-row">
+          <input
+            ref={fileInputRef}
+            id="file-input"
+            type="file"
+            multiple
+            onChange={e => addFiles(e.target.files)}
+            disabled={isStreaming || isConversationLoading}
+          />
+          <button id="attach-btn" onClick={() => fileInputRef.current?.click()} disabled={isStreaming || isConversationLoading}>
+            Attach
+          </button>
           <input
             type="text"
             id="input"
@@ -375,13 +729,14 @@ export default function App() {
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={isStreaming}
+            disabled={isStreaming || isConversationLoading}
           />
           <button id="send-btn" onClick={isStreaming ? stopStreaming : sendMessage}>
             {isStreaming ? 'Stop' : 'Send'}
           </button>
         </div>
       </div>
+
       {showModelPicker && (
         <div id="model-picker-overlay" onClick={() => setShowModelPicker(false)}>
           <div id="model-picker" onClick={e => e.stopPropagation()}>

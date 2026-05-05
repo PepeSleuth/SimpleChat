@@ -9,14 +9,13 @@ A minimal, single-file HTML chat interface for AI models via OpenRouter API.
 - **Conversation branching** - Fork conversations at any AI response
 - **Real-time streaming** - See AI responses as they're generated
 - **Model switching** - Change AI models mid-conversation
-- **Local storage** - Conversations persist in browser
+- **File attachments** - Add images, PDFs, and other files to chat messages
+- **IndexedDB storage** - Conversations, settings, and attachments persist in browser
 
 ## Planned Features
 
 - Long document support
-- Image handling
 - Code block execution
-- Reasoning configuration and traces
 - Tool calls
 - Sticky UI elements
 - Server-side conversation storage
