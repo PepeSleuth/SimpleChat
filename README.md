@@ -6,6 +6,8 @@ A minimal, single-file HTML chat interface for AI models via OpenRouter API.
 
 - **Single HTML file** - No build process, just open in browser
 - **Multiple conversations** - Create, rename, delete, and switch between chats
+- **Projects / folders** - Group conversations into lightweight projects from the sidebar
+- **Default "Unsorted" bucket** - Legacy or unfiled conversations stay in a fallback project
 - **Conversation branching** - Fork conversations at any AI response
 - **Real-time streaming** - See AI responses as they're generated
 - **Model switching** - Change AI models mid-conversation

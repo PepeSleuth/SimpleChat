@@ -1,8 +1,10 @@
 const DB_NAME = 'SimpleChat';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
+const DEFAULT_PROJECT_NAME = 'Unsorted';
 
 const STORE = {
   settings: 'settings',
+  projects: 'projects',
   conversations: 'conversations',
   messages: 'messages',
   attachments: 'attachments',
@@ -33,13 +35,32 @@ function openDatabase() {
 
     request.onupgradeneeded = () => {
       const db = request.result;
+      const tx = request.transaction;
+      const hadProjectsStore = db.objectStoreNames.contains(STORE.projects);
+      const hadConversationsStore = db.objectStoreNames.contains(STORE.conversations);
 
       if (!db.objectStoreNames.contains(STORE.settings)) {
         db.createObjectStore(STORE.settings, { keyPath: 'key' });
       }
 
+      if (!db.objectStoreNames.contains(STORE.projects)) {
+        const projects = db.createObjectStore(STORE.projects, { keyPath: 'id', autoIncrement: true });
+        projects.createIndex('isDefault', 'isDefault', { unique: false });
+      } else {
+        const projects = tx.objectStore(STORE.projects);
+        if (!projects.indexNames.contains('isDefault')) {
+          projects.createIndex('isDefault', 'isDefault', { unique: false });
+        }
+      }
+
       if (!db.objectStoreNames.contains(STORE.conversations)) {
-        db.createObjectStore(STORE.conversations, { keyPath: 'id', autoIncrement: true });
+        const conversations = db.createObjectStore(STORE.conversations, { keyPath: 'id', autoIncrement: true });
+        conversations.createIndex('projectId', 'projectId', { unique: false });
+      } else {
+        const conversations = tx.objectStore(STORE.conversations);
+        if (!conversations.indexNames.contains('projectId')) {
+          conversations.createIndex('projectId', 'projectId', { unique: false });
+        }
       }
 
       if (!db.objectStoreNames.contains(STORE.messages)) {
@@ -51,6 +72,35 @@ function openDatabase() {
         const attachments = db.createObjectStore(STORE.attachments, { keyPath: 'id', autoIncrement: true });
         attachments.createIndex('conversationId', 'conversationId', { unique: false });
         attachments.createIndex('messageId', 'messageId', { unique: false });
+      }
+
+      if (!hadProjectsStore && hadConversationsStore) {
+        const projects = tx.objectStore(STORE.projects);
+        const conversations = tx.objectStore(STORE.conversations);
+        const defaultProject = {
+          name: DEFAULT_PROJECT_NAME,
+          isDefault: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        const projectRequest = projects.add(defaultProject);
+
+        projectRequest.onsuccess = () => {
+          const defaultProjectId = projectRequest.result;
+          const cursorRequest = conversations.openCursor();
+          cursorRequest.onsuccess = event => {
+            const cursor = event.target.result;
+            if (!cursor) return;
+            const conversation = cursor.value;
+            if (conversation.projectId == null) {
+              cursor.update({
+                ...conversation,
+                projectId: defaultProjectId,
+              });
+            }
+            cursor.continue();
+          };
+        };
       }
     };
 
@@ -74,6 +124,18 @@ async function withTransaction(storeNames, mode, handler) {
   return result;
 }
 
+async function getAllFromStore(storeName) {
+  const db = await openDatabase();
+  const tx = db.transaction(storeName, 'readonly');
+  const request = tx.objectStore(storeName).getAll();
+  return requestToPromise(request);
+}
+
+async function getDefaultProject() {
+  const projects = await getAllFromStore(STORE.projects);
+  return projects.find(project => project.isDefault) ?? null;
+}
+
 async function getSetting(key) {
   const db = await openDatabase();
   const tx = db.transaction(STORE.settings, 'readonly');
@@ -85,26 +147,109 @@ async function setSetting(key, value) {
   await withTransaction(STORE.settings, 'readwrite', tx => tx.objectStore(STORE.settings).put({ key, value }));
 }
 
+async function listProjects() {
+  const projects = await getAllFromStore(STORE.projects);
+  return projects.sort((a, b) => {
+    if (a.isDefault && !b.isDefault) return -1;
+    if (!a.isDefault && b.isDefault) return 1;
+    return a.id - b.id;
+  });
+}
+
 async function listConversations() {
-  const db = await openDatabase();
-  const tx = db.transaction(STORE.conversations, 'readonly');
-  const request = tx.objectStore(STORE.conversations).getAll();
-  const conversations = await requestToPromise(request);
+  const conversations = await getAllFromStore(STORE.conversations);
   return conversations.sort((a, b) => a.id - b.id);
 }
 
-async function getConversation(conversationId) {
+async function getProject(projectId) {
   const db = await openDatabase();
-  const tx = db.transaction(STORE.conversations, 'readonly');
-  const request = tx.objectStore(STORE.conversations).get(conversationId);
+  const tx = db.transaction(STORE.projects, 'readonly');
+  const request = tx.objectStore(STORE.projects).get(projectId);
   return requestToPromise(request);
 }
 
-async function createConversation(name) {
+async function ensureDefaultProject() {
+  const existing = await getDefaultProject();
+  if (existing) return existing;
+  return createProject(DEFAULT_PROJECT_NAME, { isDefault: true });
+}
+
+async function createProject(name, { isDefault = false } = {}) {
   const now = new Date().toISOString();
+  return withTransaction(STORE.projects, 'readwrite', async tx => {
+    const project = {
+      name,
+      isDefault,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const id = await requestToPromise(tx.objectStore(STORE.projects).add(project));
+    return { id, ...project };
+  });
+}
+
+async function renameProject(projectId, name) {
+  return withTransaction(STORE.projects, 'readwrite', async tx => {
+    const store = tx.objectStore(STORE.projects);
+    const project = await requestToPromise(store.get(projectId));
+    if (!project || project.isDefault) return null;
+    const updated = { ...project, name, updatedAt: new Date().toISOString() };
+    await requestToPromise(store.put(updated));
+    return updated;
+  });
+}
+
+async function deleteProject(projectId) {
+  const defaultProject = await ensureDefaultProject();
+  if (projectId === defaultProject.id) return null;
+
+  const now = new Date().toISOString();
+  return withTransaction([STORE.projects, STORE.conversations], 'readwrite', async tx => {
+    const projectStore = tx.objectStore(STORE.projects);
+    const conversationStore = tx.objectStore(STORE.conversations);
+    const project = await requestToPromise(projectStore.get(projectId));
+    if (!project || project.isDefault) return null;
+
+    const conversations = await requestToPromise(conversationStore.index('projectId').getAll(projectId));
+    for (const conversation of conversations) {
+      await requestToPromise(conversationStore.put({
+        ...conversation,
+        projectId: defaultProject.id,
+        updatedAt: now,
+      }));
+    }
+
+    await requestToPromise(projectStore.delete(projectId));
+    return {
+      deletedProject: project,
+      fallbackProjectId: defaultProject.id,
+      movedConversationIds: conversations.map(conversation => conversation.id),
+    };
+  });
+}
+
+async function moveConversationToProject(conversationId, projectId) {
+  const now = new Date().toISOString();
+  return withTransaction([STORE.projects, STORE.conversations], 'readwrite', async tx => {
+    const store = tx.objectStore(STORE.conversations);
+    const conversation = await requestToPromise(store.get(conversationId));
+    if (!conversation) return null;
+    const targetProject = await requestToPromise(tx.objectStore(STORE.projects).get(projectId));
+    if (!targetProject) return null;
+    if (conversation.projectId === projectId) return conversation;
+    const updated = { ...conversation, projectId, updatedAt: now };
+    await requestToPromise(store.put(updated));
+    return updated;
+  });
+}
+
+async function createConversation(name, projectId = null) {
+  const now = new Date().toISOString();
+  const targetProjectId = projectId ?? (await ensureDefaultProject()).id;
   return withTransaction(STORE.conversations, 'readwrite', async tx => {
     const conversation = {
       name,
+      projectId: targetProjectId,
       createdAt: now,
       updatedAt: now,
     };
@@ -223,8 +368,9 @@ async function appendMessage({ conversationId, role, text, stats = null, attachm
   });
 }
 
-async function duplicateConversationFromMessages({ name, messages }) {
+async function duplicateConversationFromMessages({ name, messages, projectId = null }) {
   const now = new Date().toISOString();
+  const targetProjectId = projectId ?? (await ensureDefaultProject()).id;
   return withTransaction([STORE.conversations, STORE.messages, STORE.attachments], 'readwrite', async tx => {
     const conversationStore = tx.objectStore(STORE.conversations);
     const messageStore = tx.objectStore(STORE.messages);
@@ -232,6 +378,7 @@ async function duplicateConversationFromMessages({ name, messages }) {
 
     const conversationId = await requestToPromise(conversationStore.add({
       name,
+      projectId: targetProjectId,
       createdAt: now,
       updatedAt: now,
     }));
@@ -258,15 +405,34 @@ async function duplicateConversationFromMessages({ name, messages }) {
       }
     }
 
-    return { id: conversationId, name, createdAt: now, updatedAt: now };
+    return { id: conversationId, name, projectId: targetProjectId, createdAt: now, updatedAt: now };
   });
 }
 
 async function loadAppState() {
+  let projects = await listProjects();
+  let defaultProject = projects.find(project => project.isDefault);
+
+  if (!defaultProject) {
+    defaultProject = await createProject(DEFAULT_PROJECT_NAME, { isDefault: true });
+    projects = await listProjects();
+  }
+
   let conversations = await listConversations();
+  const knownProjectIds = new Set(projects.map(project => project.id));
+  const conversationsNeedingProject = conversations.filter(conversation => (
+    conversation.projectId == null || !knownProjectIds.has(conversation.projectId)
+  ));
+
+  if (conversationsNeedingProject.length) {
+    for (const conversation of conversationsNeedingProject) {
+      await moveConversationToProject(conversation.id, defaultProject.id);
+    }
+    conversations = await listConversations();
+  }
 
   if (!conversations.length) {
-    const created = await createConversation('Conversation 1');
+    const created = await createConversation('Conversation 1', defaultProject.id);
     conversations = [created];
   }
 
@@ -295,6 +461,7 @@ async function loadAppState() {
   if (settings.webSearchEnabled == null) settings.webSearchEnabled = false;
 
   return {
+    projects,
     conversations,
     currentConversationId,
     messages,
@@ -304,11 +471,16 @@ async function loadAppState() {
 
 export {
   appendMessage,
+  createProject,
   createConversation,
   deleteConversation,
+  deleteProject,
   duplicateConversationFromMessages,
   loadAppState,
   loadConversationMessages,
+  listProjects,
+  moveConversationToProject,
   renameConversation,
+  renameProject,
   setSetting,
 };

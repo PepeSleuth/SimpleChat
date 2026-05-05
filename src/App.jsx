@@ -9,12 +9,16 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import {
   appendMessage,
+  createProject,
   createConversation,
   deleteConversation as deleteConversationRecord,
+  deleteProject as deleteProjectRecord,
   duplicateConversationFromMessages,
   loadAppState,
   loadConversationMessages,
+  moveConversationToProject as moveConversationToProjectRecord,
   renameConversation as renameConversationRecord,
+  renameProject as renameProjectRecord,
   setSetting,
 } from './chatDb';
 
@@ -226,6 +230,7 @@ export default function App() {
   const [modelInput, setModelInput] = useState(DEFAULT_MODEL);
 
   const [conversations, setConversations] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
 
@@ -250,6 +255,7 @@ export default function App() {
   const previousMessagesRef = useRef([]);
 
   const currentConv = conversations.find(c => c.id === currentConversationId);
+  const defaultProject = projects.find(project => project.isDefault) ?? projects[0] ?? null;
   const isInputDisabled = isStreaming || isConversationLoading;
 
   useEffect(() => {
@@ -266,6 +272,7 @@ export default function App() {
         setModel(savedModel);
         setModelInput(savedModel);
         setConfigured(Boolean(state.settings.apiKey));
+        setProjects(state.projects);
         setConversations(state.conversations);
         setCurrentConversationId(state.currentConversationId);
         setMessages(hydrateMessages(state.messages));
@@ -351,6 +358,39 @@ export default function App() {
     setSetting('webSearchEnabled', nextValue);
   }
 
+  function getProjectById(projectId) {
+    return projects.find(project => project.id === projectId) ?? null;
+  }
+
+  function getConversationProject(conv) {
+    return getProjectById(conv.projectId) ?? defaultProject;
+  }
+
+  function chooseProjectId(message, initialValue = '') {
+    if (!projects.length) return null;
+
+    const lines = projects.map((project, index) => {
+      const suffix = project.isDefault ? ' (default)' : '';
+      return `${index + 1}. ${project.name}${suffix}`;
+    }).join('\n');
+
+    const answer = prompt(`${message}\n\n${lines}`, initialValue);
+    if (!answer) return null;
+
+    const trimmed = answer.trim();
+    const numericChoice = Number(trimmed);
+    if (Number.isInteger(numericChoice) && numericChoice >= 1 && numericChoice <= projects.length) {
+      return projects[numericChoice - 1].id;
+    }
+
+    const exactMatch = projects.find(project => project.name.toLowerCase() === trimmed.toLowerCase());
+    return exactMatch?.id ?? null;
+  }
+
+  function updateConversations(nextConversation) {
+    setConversations(prev => prev.map(conv => (conv.id === nextConversation.id ? nextConversation : conv)));
+  }
+
   async function openConversation(conversationId) {
     if (conversationId == null || isStreaming || isConversationLoading) return;
     const seq = ++loadSeqRef.current;
@@ -370,11 +410,32 @@ export default function App() {
     }
   }
 
-  async function newConversation() {
+  async function newProject() {
     if (isStreaming || isConversationLoading) return;
 
+    const name = prompt('Enter project name:', `Project ${projects.filter(project => !project.isDefault).length + 1}`);
+    if (!name || !name.trim()) return;
+
     try {
-      const conversation = await createConversation(`Conversation ${conversations.length + 1}`);
+      const project = await createProject(name.trim());
+      setProjects(prev => [...prev, project].sort((a, b) => {
+        if (a.isDefault && !b.isDefault) return -1;
+        if (!a.isDefault && b.isDefault) return 1;
+        return a.id - b.id;
+      }));
+    } catch (err) {
+      setError(err.message || 'Failed to create project');
+    }
+  }
+
+  async function newConversation(projectId = defaultProject?.id) {
+    if (isStreaming || isConversationLoading) return;
+    if (projectId == null) return;
+
+    try {
+      const project = getProjectById(projectId) ?? defaultProject;
+      const projectConversationCount = conversations.filter(conv => conv.projectId === (project?.id ?? projectId)).length;
+      const conversation = await createConversation(`Conversation ${projectConversationCount + 1}`, project?.id ?? projectId);
       setConversations(prev => [...prev, conversation]);
       await openConversation(conversation.id);
     } catch (err) {
@@ -396,6 +457,41 @@ export default function App() {
     }
   }
 
+  async function renameProject(project) {
+    if (project.isDefault) return;
+
+    const newName = prompt('Enter new project name:', project.name);
+    if (!newName || !newName.trim() || newName.trim() === project.name) return;
+
+    try {
+      const updated = await renameProjectRecord(project.id, newName.trim());
+      if (updated) {
+        setProjects(prev => prev.map(item => (item.id === project.id ? updated : item)));
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to rename project');
+    }
+  }
+
+  async function moveConversation(conv) {
+    if (projects.length <= 1) {
+      alert('Create another project first');
+      return;
+    }
+
+    const targetProjectId = chooseProjectId(`Move "${conv.name}" to which project?`, getConversationProject(conv)?.name ?? '');
+    if (targetProjectId == null || targetProjectId === conv.projectId) return;
+
+    try {
+      const updated = await moveConversationToProjectRecord(conv.id, targetProjectId);
+      if (updated) {
+        updateConversations(updated);
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to move conversation');
+    }
+  }
+
   async function deleteConversation(conv) {
     if (conversations.length <= 1) {
       alert('Cannot delete the last conversation');
@@ -412,10 +508,33 @@ export default function App() {
       setConversations(remaining);
 
       if (currentConversationId === conv.id) {
-        await openConversation(remaining[0].id);
+        const sameProject = remaining.find(c => c.projectId === conv.projectId) ?? remaining[0];
+        await openConversation(sameProject.id);
       }
     } catch (err) {
       setError(err.message || 'Failed to delete conversation');
+    }
+  }
+
+  async function deleteProject(project) {
+    if (project.isDefault) return;
+
+    const projectConversationCount = conversations.filter(conv => conv.projectId === project.id).length;
+    const suffix = projectConversationCount ? ` and move ${projectConversationCount} conversation${projectConversationCount === 1 ? '' : 's'} to Unsorted` : '';
+    if (!confirm(`Delete project "${project.name}"${suffix}?`)) return;
+
+    try {
+      const result = await deleteProjectRecord(project.id);
+      if (!result) return;
+
+      setProjects(prev => prev.filter(item => item.id !== project.id));
+      setConversations(prev => prev.map(conv => (
+        conv.projectId === project.id
+          ? { ...conv, projectId: result.fallbackProjectId }
+          : conv
+      )));
+    } catch (err) {
+      setError(err.message || 'Failed to delete project');
     }
   }
 
@@ -430,6 +549,7 @@ export default function App() {
       const branch = await duplicateConversationFromMessages({
         name: branchName.trim(),
         messages: branchMessages,
+        projectId: currentConv.projectId,
       });
       setConversations(prev => [...prev, branch]);
       await openConversation(branch.id);
@@ -694,32 +814,93 @@ export default function App() {
       <aside id="sidebar">
         <div id="sidebar-header">
           <h1>SimpleChat</h1>
-          <button id="new-conv-btn" onClick={newConversation} title="New conversation">+</button>
+          <button id="new-project-btn" onClick={newProject} title="New project">+ Project</button>
         </div>
 
-        <nav id="conv-list">
-          {conversations.map(conv => (
-            <div
-              key={conv.id}
-              className={`conv-item${conv.id === currentConversationId ? ' active' : ''}`}
-              onClick={() => openConversation(conv.id)}
-            >
-              <span className="conv-name">{conv.name}</span>
-              <span className="conv-actions">
-                <button
-                  className="conv-action-btn"
-                  title="Rename"
-                  onClick={e => { e.stopPropagation(); renameConversation(conv); }}
-                >✎</button>
-                <button
-                  className="conv-action-btn delete"
-                  title="Delete"
-                  disabled={conversations.length <= 1}
-                  onClick={e => { e.stopPropagation(); deleteConversation(conv); }}
-                >✕</button>
-              </span>
-            </div>
-          ))}
+        <nav id="project-list">
+          {projects.map(project => {
+            const projectConversations = conversations.filter(conv => conv.projectId === project.id);
+            const isActiveProject = currentConv?.projectId === project.id;
+
+            return (
+              <section key={project.id} className={`project-group${isActiveProject ? ' active' : ''}`}>
+                <div className="project-header">
+                  <div className="project-title">
+                    <span className="project-name">{project.name}</span>
+                    {project.isDefault && <span className="project-default-tag">default</span>}
+                    <span className="project-count">{projectConversations.length}</span>
+                  </div>
+                  <div className="project-actions">
+                    <button
+                      className="project-action-btn"
+                      title="New conversation"
+                      onClick={() => newConversation(project.id)}
+                    >
+                      +
+                    </button>
+                    {!project.isDefault && (
+                      <>
+                        <button
+                          className="project-action-btn"
+                          title="Rename project"
+                          onClick={() => renameProject(project)}
+                        >
+                          ✎
+                        </button>
+                        <button
+                          className="project-action-btn delete"
+                          title="Delete project"
+                          onClick={() => deleteProject(project)}
+                        >
+                          ✕
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="project-conversation-list">
+                  {projectConversations.length === 0 ? (
+                    <div className="project-empty">No conversations yet</div>
+                  ) : (
+                    projectConversations.map(conv => (
+                      <div
+                        key={conv.id}
+                        className={`conv-item project-conv-item${conv.id === currentConversationId ? ' active' : ''}`}
+                        onClick={() => openConversation(conv.id)}
+                      >
+                        <span className="conv-name">{conv.name}</span>
+                        <span className="conv-actions">
+                          <button
+                            className="conv-action-btn"
+                            title="Move"
+                            onClick={e => { e.stopPropagation(); moveConversation(conv); }}
+                          >
+                            ↪
+                          </button>
+                          <button
+                            className="conv-action-btn"
+                            title="Rename"
+                            onClick={e => { e.stopPropagation(); renameConversation(conv); }}
+                          >
+                            ✎
+                          </button>
+                          <button
+                            className="conv-action-btn delete"
+                            title="Delete"
+                            disabled={conversations.length <= 1}
+                            onClick={e => { e.stopPropagation(); deleteConversation(conv); }}
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+            );
+          })}
         </nav>
 
         <div id="sidebar-footer">
