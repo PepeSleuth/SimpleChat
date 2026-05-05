@@ -274,6 +274,7 @@ async function loadAppState() {
     apiKey: (await getSetting('apiKey'))?.value ?? '',
     model: (await getSetting('model'))?.value ?? '',
     reasoningEffort: (await getSetting('reasoningEffort'))?.value ?? null,
+    webSearchEnabled: (await getSetting('webSearchEnabled'))?.value ?? false,
     currentConversationId: (await getSetting('currentConversationId'))?.value ?? null,
   };
 
@@ -291,6 +292,7 @@ async function loadAppState() {
 
   if (settings.model == null) settings.model = '';
   if (settings.reasoningEffort == null) settings.reasoningEffort = null;
+  if (settings.webSearchEnabled == null) settings.webSearchEnabled = false;
 
   return {
     conversations,

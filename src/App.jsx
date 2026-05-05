@@ -85,6 +85,11 @@ function MessageStats({ stats }) {
         {stats.totalTokens} tokens
       </span>,
     ] : []),
+    ...(stats.webSearchRequests ? [
+      <span key="searches" title="OpenRouter web search requests">
+        {stats.webSearchRequests} search{stats.webSearchRequests === 1 ? '' : 'es'}
+      </span>,
+    ] : []),
     ...(costStr ? [<span key="cost">{costStr}</span>] : []),
   ];
 
@@ -199,6 +204,19 @@ function makeDraftAttachment(file) {
   };
 }
 
+function hasFileDrag(dataTransfer) {
+  if (!dataTransfer) return false;
+  const types = Array.from(dataTransfer.types ?? []);
+  if (types.includes('Files')) return true;
+  return Array.from(dataTransfer.items ?? []).some(item => item.kind === 'file');
+}
+
+function createOpenRouterTools(openrouter) {
+  return {
+    web_search: openrouter.tools.webSearch({}),
+  };
+}
+
 export default function App() {
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState(DEFAULT_MODEL);
@@ -221,14 +239,18 @@ export default function App() {
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [modelPickerInput, setModelPickerInput] = useState('');
   const [reasoningEffort, setReasoningEffort] = useState(null);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
 
   const chatRef = useRef(null);
   const abortRef = useRef(null);
   const fileInputRef = useRef(null);
+  const fileDragDepthRef = useRef(0);
   const loadSeqRef = useRef(0);
   const previousMessagesRef = useRef([]);
 
   const currentConv = conversations.find(c => c.id === currentConversationId);
+  const isInputDisabled = isStreaming || isConversationLoading;
 
   useEffect(() => {
     let cancelled = false;
@@ -248,6 +270,7 @@ export default function App() {
         setCurrentConversationId(state.currentConversationId);
         setMessages(hydrateMessages(state.messages));
         setReasoningEffort(state.settings.reasoningEffort ?? null);
+        setWebSearchEnabled(Boolean(state.settings.webSearchEnabled));
       } catch (err) {
         if (!cancelled) setError(err.message || 'Failed to load chats');
       } finally {
@@ -305,6 +328,7 @@ export default function App() {
     setSetting('apiKey', nextApiKey);
     setSetting('model', nextModel);
     if (reasoningEffort !== null) setSetting('reasoningEffort', reasoningEffort);
+    setSetting('webSearchEnabled', webSearchEnabled);
   }
 
   function changeModel() {
@@ -319,6 +343,12 @@ export default function App() {
     setModelInput(trimmed);
     setSetting('model', trimmed);
     setShowModelPicker(false);
+  }
+
+  function toggleWebSearch() {
+    const nextValue = !webSearchEnabled;
+    setWebSearchEnabled(nextValue);
+    setSetting('webSearchEnabled', nextValue);
   }
 
   async function openConversation(conversationId) {
@@ -424,6 +454,50 @@ export default function App() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
+  function openFilePicker() {
+    if (isInputDisabled) return;
+    fileInputRef.current?.click();
+  }
+
+  function resetFileDragState() {
+    fileDragDepthRef.current = 0;
+    setIsDraggingFiles(false);
+  }
+
+  function handleFileDragEnter(e) {
+    if (isInputDisabled || !hasFileDrag(e.dataTransfer)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    fileDragDepthRef.current += 1;
+    setIsDraggingFiles(true);
+  }
+
+  function handleFileDragOver(e) {
+    if (isInputDisabled || !hasFileDrag(e.dataTransfer)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsDraggingFiles(true);
+  }
+
+  function handleFileDragLeave(e) {
+    if (isInputDisabled || !hasFileDrag(e.dataTransfer)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    fileDragDepthRef.current = Math.max(0, fileDragDepthRef.current - 1);
+    if (fileDragDepthRef.current === 0) {
+      setIsDraggingFiles(false);
+    }
+  }
+
+  function handleFileDrop(e) {
+    if (isInputDisabled) return;
+    e.preventDefault();
+    e.stopPropagation();
+    resetFileDragState();
+    addFiles(e.dataTransfer.files);
+  }
+
   function removePendingAttachment(id) {
     setPendingAttachments(prev => {
       const next = [];
@@ -497,11 +571,13 @@ export default function App() {
         usage: { include: true },
         ...(reasoningEffort ? { extraBody: { reasoning: { effort: reasoningEffort } } } : {}),
       };
+      const tools = webSearchEnabled ? createOpenRouterTools(openrouter) : undefined;
 
       const modelMessages = await messagesToModelMessages([...draftMessages, userMessage]);
       const result = streamText({
         model: openrouter(model, modelOptions),
         messages: modelMessages,
+        ...(tools ? { tools } : {}),
         abortSignal: controller.signal,
       });
 
@@ -517,6 +593,7 @@ export default function App() {
       const usage = await result.usage;
       const providerMeta = (await result.providerMetadata) ?? (await result.experimental_providerMetadata);
       const cost = providerMeta?.openrouter?.usage?.cost ?? null;
+      const webSearchRequests = providerMeta?.openrouter?.usage?.server_tool_use?.web_search_requests ?? null;
       const assistantRecord = await appendMessage({
         conversationId: currentConversationId,
         role: 'assistant',
@@ -527,6 +604,7 @@ export default function App() {
           promptTokens: usage?.promptTokens,
           completionTokens: usage?.completionTokens,
           totalTokens: usage?.totalTokens,
+          webSearchRequests,
           cost,
         },
       });
@@ -584,6 +662,16 @@ export default function App() {
             value={modelInput}
             onChange={e => setModelInput(e.target.value)}
           />
+          <div className="setup-toggle-row">
+            <span>Web search</span>
+            <button
+              type="button"
+              className={`toggle-btn${webSearchEnabled ? ' active' : ''}`}
+              onClick={toggleWebSearch}
+            >
+              {webSearchEnabled ? 'on' : 'off'}
+            </button>
+          </div>
           <button onClick={saveConfig}>Save</button>
         </div>
         {error && <div className="error">Error: {error}</div>}
@@ -627,6 +715,17 @@ export default function App() {
         <div id="sidebar-footer">
           <span id="model-label" title={model}>{model}</span>
           <button id="change-model-btn" onClick={changeModel}>Change model</button>
+          <div id="web-search-row">
+            <span id="web-search-label">Web search</span>
+            <button
+              type="button"
+              id="web-search-toggle"
+              className={webSearchEnabled ? 'active' : ''}
+              onClick={toggleWebSearch}
+            >
+              {webSearchEnabled ? 'on' : 'off'}
+            </button>
+          </div>
           <div id="reasoning-row">
             <span id="reasoning-label">Reasoning</span>
             <div id="reasoning-btns">
@@ -699,7 +798,7 @@ export default function App() {
         </div>
 
         {pendingAttachments.length > 0 && (
-          <div id="attachment-draft">
+        <div id="attachment-draft">
             <div id="attachment-draft-header">
               <span>Attachments</span>
               <button type="button" id="clear-attachments-btn" onClick={clearPendingAttachments}>
@@ -717,11 +816,30 @@ export default function App() {
             type="file"
             multiple
             onChange={e => addFiles(e.target.files)}
-            disabled={isStreaming || isConversationLoading}
+            disabled={isInputDisabled}
           />
-          <button id="attach-btn" onClick={() => fileInputRef.current?.click()} disabled={isStreaming || isConversationLoading}>
-            Attach
-          </button>
+          <div
+            id="file-dropzone"
+            className={isDraggingFiles ? 'dragging' : ''}
+            role="button"
+            tabIndex={isInputDisabled ? -1 : 0}
+            aria-label="Add files by dragging and dropping or clicking to browse"
+            aria-disabled={isInputDisabled}
+            onClick={openFilePicker}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openFilePicker();
+              }
+            }}
+            onDragEnter={handleFileDragEnter}
+            onDragOver={handleFileDragOver}
+            onDragLeave={handleFileDragLeave}
+            onDrop={handleFileDrop}
+          >
+            <span className="file-dropzone-title">Drop files here</span>
+            <span className="file-dropzone-hint">or click to browse</span>
+          </div>
           <input
             type="text"
             id="input"
@@ -729,7 +847,7 @@ export default function App() {
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={isStreaming || isConversationLoading}
+            disabled={isInputDisabled}
           />
           <button id="send-btn" onClick={isStreaming ? stopStreaming : sendMessage}>
             {isStreaming ? 'Stop' : 'Send'}
