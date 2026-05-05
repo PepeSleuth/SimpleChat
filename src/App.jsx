@@ -10,6 +10,42 @@ import 'katex/dist/katex.min.css';
 
 const MODEL_LIST = modelsRaw.split('\n').map(l => l.trim()).filter(Boolean);
 
+function formatCost(cost) {
+  if (cost == null) return null;
+  const value = typeof cost === 'string' ? Number(cost) : cost;
+  if (!Number.isFinite(value)) return null;
+  if (value === 0) return '$0.00';
+  if (value < 0.01) return `$${value.toFixed(6)}`;
+  return `$${value.toFixed(4)}`;
+}
+
+function MessageStats({ stats }) {
+  if (!stats) return null;
+  const d = new Date(stats.date);
+  const date = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  const costStr = formatCost(stats.cost);
+  const parts = [
+    <span key="model" title={stats.model}>{stats.model}</span>,
+    <span key="date">{date}</span>,
+    ...(stats.totalTokens != null ? [
+      <span key="tokens" title={`${stats.promptTokens} prompt + ${stats.completionTokens} completion`}>
+        {stats.totalTokens} tokens
+      </span>
+    ] : []),
+    ...(costStr ? [<span key="cost">{costStr}</span>] : []),
+  ];
+  return (
+    <div className="message-stats">
+      {parts.map((part, i) => (
+        <>
+          {i > 0 && <span key={`sep${i}`} className="stats-sep">|</span>}
+          {part}
+        </>
+      ))}
+    </div>
+  );
+}
+
 const LS = {
   get: (k, fallback) => {
     try {
@@ -51,7 +87,6 @@ export default function App() {
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [modelPickerInput, setModelPickerInput] = useState('');
   const [reasoningEffort, setReasoningEffort] = useState(() => LS.getRaw('reasoning-effort') || null);
-
   const chatRef = useRef(null);
   const abortRef = useRef(null);
 
@@ -156,7 +191,10 @@ export default function App() {
 
     try {
       const openrouter = createOpenRouter({ apiKey });
-      const modelOptions = reasoningEffort ? { extraBody: { reasoning: { effort: reasoningEffort } } } : {};
+      const modelOptions = {
+        usage: { include: true },
+        ...(reasoningEffort ? { extraBody: { reasoning: { effort: reasoningEffort } } } : {}),
+      };
       const result = streamText({
         model: openrouter(model, modelOptions),
         messages: updatedMessages,
@@ -169,7 +207,21 @@ export default function App() {
         setStreamingText(fullText);
       }
 
-      const assistantMsg = { role: 'assistant', content: fullText };
+      const usage = await result.usage;
+      const providerMeta = (await result.providerMetadata) ?? (await result.experimental_providerMetadata);
+      const cost = providerMeta?.openrouter?.usage?.cost ?? null;
+      const assistantMsg = {
+        role: 'assistant',
+        content: fullText,
+        stats: {
+          date: new Date().toISOString(),
+          model,
+          promptTokens: usage?.promptTokens,
+          completionTokens: usage?.completionTokens,
+          totalTokens: usage?.totalTokens,
+          cost,
+        },
+      };
       setConversations(prev =>
         prev.map(c =>
           c.id === currentConversationId
@@ -287,9 +339,12 @@ export default function App() {
                   <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.content}</ReactMarkdown>
                 ) : msg.content}
                 {msg.role === 'assistant' && (
-                  <button className="branch-btn" onClick={() => branchConversation(i)}>
-                    Branch
-                  </button>
+                  <>
+                    <MessageStats stats={msg.stats} />
+                    <button className="branch-btn" onClick={() => branchConversation(i)}>
+                      Branch
+                    </button>
+                  </>
                 )}
               </div>
             </div>

@@ -360,6 +360,38 @@ button {
   51%, 100% { opacity: 0; }
 }
 
+/* Message stats */
+.message-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px solid #eee;
+  font-size: 11px;
+  color: #bbb;
+  font-family: monospace;
+  visibility: hidden;
+}
+
+.message:hover .message-stats {
+  visibility: visible;
+}
+
+.message-stats span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+.stats-sep {
+  color: #ddd;
+  user-select: none;
+  max-width: unset;
+}
+
 /* Branch button */
 .branch-btn {
   margin-left: 10px;
