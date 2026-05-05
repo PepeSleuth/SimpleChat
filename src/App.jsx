@@ -373,11 +373,8 @@ export default function App() {
   async function newConversation() {
     if (isStreaming || isConversationLoading) return;
 
-    const name = prompt('Enter conversation name:', `Conversation ${conversations.length + 1}`);
-    if (!name || !name.trim()) return;
-
     try {
-      const conversation = await createConversation(name.trim());
+      const conversation = await createConversation(`Conversation ${conversations.length + 1}`);
       setConversations(prev => [...prev, conversation]);
       await openConversation(conversation.id);
     } catch (err) {
@@ -565,6 +562,19 @@ export default function App() {
       };
 
       setMessages(prev => [...prev, userMessage]);
+
+      if (draftMessages.length === 0 && text) {
+        try {
+          const updatedConversation = await renameConversationRecord(currentConversationId, text);
+          if (updatedConversation) {
+            setConversations(prev => prev.map(conv => (
+              conv.id === currentConversationId ? updatedConversation : conv
+            )));
+          }
+        } catch (renameErr) {
+          console.error('Failed to auto-title conversation from first message', renameErr);
+        }
+      }
 
       const openrouter = createOpenRouter({ apiKey });
       const modelOptions = {
