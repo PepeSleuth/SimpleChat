@@ -9,6 +9,10 @@ import {
   deleteConversation as deleteConversationRecord,
   deleteProject as deleteProjectRecord,
   duplicateConversationFromMessages,
+  exportAllData,
+  importAllData,
+  listConversations,
+  listProjects,
   loadAppState,
   loadConversationMessages,
   moveConversationToProject as moveConversationToProjectRecord,
@@ -16,6 +20,7 @@ import {
   renameProject as renameProjectRecord,
   setSetting,
 } from './chatDb';
+import { downloadJson } from './lib/exportUtils';
 import { hydrateMessages, releaseAttachmentUrls, makeDraftAttachment } from './lib/attachments';
 import { messagesToModelMessages, createOpenRouterTools } from './lib/messageUtils';
 import SetupScreen from './components/SetupScreen';
@@ -365,6 +370,35 @@ export default function App() {
     }
   }
 
+  async function handleExport() {
+    try {
+      const data = await exportAllData();
+      const date = new Date().toISOString().slice(0, 10);
+      downloadJson(data, `simplechat-backup-${date}.json`);
+    } catch (err) {
+      setError(err.message || 'Export failed');
+    }
+  }
+
+  async function handleImport(file) {
+    let data;
+    try {
+      const text = await file.text();
+      data = JSON.parse(text);
+    } catch {
+      setError('Invalid JSON file');
+      return;
+    }
+    try {
+      await importAllData(data);
+      const [nextProjects, nextConversations] = await Promise.all([listProjects(), listConversations()]);
+      setProjects(nextProjects);
+      setConversations(nextConversations);
+    } catch (err) {
+      setError(err.message || 'Import failed');
+    }
+  }
+
   function stopStreaming() {
     abortRef.current?.abort();
   }
@@ -591,6 +625,8 @@ export default function App() {
         onChangeModel={changeModel}
         onToggleWebSearch={toggleWebSearch}
         onSetReasoningEffort={handleSetReasoningEffort}
+        onExport={handleExport}
+        onImport={handleImport}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">

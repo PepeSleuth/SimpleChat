@@ -290,6 +290,104 @@ async function loadAppState() {
   return { projects, conversations, currentConversationId, messages, settings };
 }
 
+async function exportAllData() {
+  const projects = await db.projects.toArray();
+  const conversations = await db.conversations.toArray();
+  const messages = await db.messages.toArray();
+
+  const convsByProject = new Map();
+  for (const conv of conversations) {
+    const list = convsByProject.get(conv.projectId) ?? [];
+    list.push(conv);
+    convsByProject.set(conv.projectId, list);
+  }
+
+  const msgsByConv = new Map();
+  for (const msg of messages) {
+    const list = msgsByConv.get(msg.conversationId) ?? [];
+    list.push(msg);
+    msgsByConv.set(msg.conversationId, list);
+  }
+
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    projects: projects.map(project => ({
+      name: project.name,
+      isDefault: project.isDefault,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+      conversations: (convsByProject.get(project.id) ?? []).map(conv => ({
+        name: conv.name,
+        createdAt: conv.createdAt,
+        updatedAt: conv.updatedAt,
+        messages: (msgsByConv.get(conv.id) ?? [])
+          .sort((a, b) => a.id - b.id)
+          .map(msg => ({
+            role: msg.role,
+            text: msg.text ?? '',
+            stats: msg.stats ?? null,
+            createdAt: msg.createdAt,
+          })),
+      })),
+    })),
+  };
+}
+
+async function importAllData(data) {
+  if (data.version !== 1 || !Array.isArray(data.projects)) {
+    throw new Error('Invalid backup format');
+  }
+
+  const defaultProject = await ensureDefaultProject();
+  let projectsCreated = 0;
+  let conversationsCreated = 0;
+  let messagesCreated = 0;
+
+  await db.transaction('rw', [db.projects, db.conversations, db.messages], async () => {
+    for (const projectData of data.projects) {
+      const now = new Date().toISOString();
+      let projectId;
+
+      if (projectData.isDefault) {
+        projectId = defaultProject.id;
+      } else {
+        projectId = await db.projects.add({
+          name: projectData.name,
+          isDefault: false,
+          createdAt: projectData.createdAt ?? now,
+          updatedAt: projectData.updatedAt ?? now,
+        });
+        projectsCreated++;
+      }
+
+      for (const convData of projectData.conversations ?? []) {
+        const now = new Date().toISOString();
+        const conversationId = await db.conversations.add({
+          name: convData.name,
+          projectId,
+          createdAt: convData.createdAt ?? now,
+          updatedAt: convData.updatedAt ?? now,
+        });
+        conversationsCreated++;
+
+        for (const msgData of convData.messages ?? []) {
+          await db.messages.add({
+            conversationId,
+            role: msgData.role,
+            text: msgData.text ?? '',
+            stats: msgData.stats ?? null,
+            createdAt: msgData.createdAt ?? now,
+          });
+          messagesCreated++;
+        }
+      }
+    }
+  });
+
+  return { projectsCreated, conversationsCreated, messagesCreated };
+}
+
 export {
   appendMessage,
   createProject,
@@ -297,8 +395,11 @@ export {
   deleteConversation,
   deleteProject,
   duplicateConversationFromMessages,
+  exportAllData,
+  importAllData,
   loadAppState,
   loadConversationMessages,
+  listConversations,
   listProjects,
   moveConversationToProject,
   renameConversation,

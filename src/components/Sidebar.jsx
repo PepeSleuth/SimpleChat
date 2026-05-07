@@ -23,6 +23,8 @@ export default function Sidebar({
   onChangeModel,
   onToggleWebSearch,
   onSetReasoningEffort,
+  onExport,
+  onImport,
 }) {
   return (
     <aside className="w-60 shrink-0 flex flex-col bg-[#f5f5f5] border-r border-[#ddd]">
@@ -155,6 +157,23 @@ export default function Sidebar({
               </button>
             ))}
           </div>
+        </div>
+        <div className="flex gap-1 mt-[2px] pt-2 border-t border-[#eee]">
+          <button
+            className="flex-1 py-1 px-0 text-xs bg-transparent text-[#555] border border-[#ccc] cursor-pointer hover:border-[#999] hover:text-black"
+            onClick={onExport}
+          >
+            Export
+          </button>
+          <label className="flex-1 py-1 px-0 text-xs bg-transparent text-[#555] border border-[#ccc] cursor-pointer hover:border-[#999] hover:text-black text-center">
+            Import
+            <input
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={e => { if (e.target.files[0]) { onImport(e.target.files[0]); e.target.value = ''; } }}
+            />
+          </label>
         </div>
       </div>
     </aside>
