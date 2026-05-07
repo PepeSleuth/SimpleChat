@@ -425,18 +425,6 @@ export default function App() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  function handleFileDragOver(e) {
-    if (isStreaming || isConversationLoading) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-  }
-
-  function handleFileDrop(e) {
-    if (isStreaming || isConversationLoading) return;
-    e.preventDefault();
-    addFiles(e.dataTransfer.files);
-  }
-
   function removePendingAttachment(id) {
     setPendingAttachments(prev => {
       const next = [];
@@ -656,8 +644,6 @@ export default function App() {
           isConversationLoading={isConversationLoading}
           fileInputRef={fileInputRef}
           onAddFiles={addFiles}
-          onDragOver={handleFileDragOver}
-          onDrop={handleFileDrop}
           onRemoveAttachment={removePendingAttachment}
           onClearAttachments={clearPendingAttachments}
           onSend={sendMessage}

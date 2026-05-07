@@ -7,8 +7,6 @@ export default function ChatInput({
   isConversationLoading,
   fileInputRef,
   onAddFiles,
-  onDragOver,
-  onDrop,
   onRemoveAttachment,
   onClearAttachments,
   onSend,
@@ -39,6 +37,15 @@ export default function ChatInput({
     }
   }
 
+  function handlePaste(e) {
+    if (isInputDisabled) return;
+    const files = e.clipboardData?.files;
+    if (files && files.length > 0) {
+      e.preventDefault();
+      onAddFiles(files);
+    }
+  }
+
   return (
     <>
       {pendingAttachments.length > 0 && (
@@ -58,27 +65,14 @@ export default function ChatInput({
       )}
 
       <div className="flex border-t border-[#ddd] py-3 px-5 gap-[10px] bg-white items-end flex-wrap">
-        <label
-          className={[
-            'flex flex-col justify-center gap-[2px] m-0 py-[9px] px-[14px]',
-            'min-w-[170px] min-h-[46px] text-[13px] border border-dashed border-[#c8c8c8]',
-            'cursor-pointer shrink-0 select-none hover:border-black',
-            isInputDisabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : '',
-          ].join(' ')}
-          onDragOver={onDragOver}
-          onDrop={onDrop}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={e => onAddFiles(e.target.files)}
-            disabled={isInputDisabled}
-          />
-          <span className="font-bold">Drop files here</span>
-          <span className="text-[#666]">or click to browse</span>
-        </label>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={e => onAddFiles(e.target.files)}
+          disabled={isInputDisabled}
+        />
         <textarea
           ref={textareaRef}
           rows={1}
@@ -88,6 +82,7 @@ export default function ChatInput({
           value={inputText}
           onChange={e => setInputText(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           disabled={isInputDisabled}
         />
         <button
