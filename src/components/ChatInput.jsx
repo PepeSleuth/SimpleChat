@@ -1,14 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import MessageAttachments from './MessageAttachments';
 
 export default function ChatInput({
-  inputText,
   pendingAttachments,
   isStreaming,
   isConversationLoading,
   fileInputRef,
-  onInputChange,
-  onKeyDown,
   onAddFiles,
   onDragOver,
   onDrop,
@@ -17,6 +14,7 @@ export default function ChatInput({
   onSend,
   onStop,
 }) {
+  const [inputText, setInputText] = useState('');
   const isInputDisabled = isStreaming || isConversationLoading;
   const textareaRef = useRef(null);
 
@@ -26,6 +24,20 @@ export default function ChatInput({
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 200) + 'px';
   }, [inputText]);
+
+  function submit() {
+    const text = inputText.trim();
+    if (!text) return;
+    onSend(text);
+    setInputText('');
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submit();
+    }
+  }
 
   return (
     <>
@@ -74,13 +86,13 @@ export default function ChatInput({
           className="flex-1 min-w-[180px] py-[10px] px-3 text-base border border-[#ccc] outline-none focus:border-black resize-none overflow-y-auto leading-normal"
           style={{ maxHeight: '200px' }}
           value={inputText}
-          onChange={e => onInputChange(e.target.value)}
-          onKeyDown={onKeyDown}
+          onChange={e => setInputText(e.target.value)}
+          onKeyDown={handleKeyDown}
           disabled={isInputDisabled}
         />
         <button
           className="m-0 py-[10px] px-5 text-base bg-black text-white border-none cursor-pointer shrink-0 hover:bg-[#333] disabled:bg-[#999] disabled:cursor-not-allowed"
-          onClick={isStreaming ? onStop : onSend}
+          onClick={isStreaming ? onStop : submit}
         >
           {isStreaming ? 'Stop' : 'Send'}
         </button>

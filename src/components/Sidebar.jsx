@@ -1,4 +1,28 @@
+import { useState } from 'react';
+
 const convActionBase = 'm-0 py-[2px] px-[5px] text-xs bg-transparent text-inherit border border-current cursor-pointer opacity-60 rounded-[3px] hover:opacity-100';
+
+function SearchInput({ onSubmit, onClear }) {
+  const [value, setValue] = useState('');
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        placeholder="Search conversations…"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') onSubmit(value); }}
+        className="w-full py-1.5 pl-3 pr-7 text-[13px] bg-white border border-[#ddd] rounded-full outline-none focus:border-[#aaa] placeholder-[#bbb]"
+      />
+      {value && (
+        <button
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-[#aaa] hover:text-[#555] text-sm leading-none"
+          onClick={() => { setValue(''); onClear(); }}
+        >✕</button>
+      )}
+    </div>
+  );
+}
 
 export default function Sidebar({
   projects,
@@ -25,8 +49,8 @@ export default function Sidebar({
   onSetReasoningEffort,
   onExport,
   onImport,
-  searchQuery,
-  onSearchChange,
+  onSearchSubmit,
+  onSearchClear,
   isSearching,
 }) {
   return (
@@ -43,21 +67,7 @@ export default function Sidebar({
       </div>
 
       <div className="px-2 py-2 border-b border-[#ddd]">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Search conversations…"
-            value={searchQuery}
-            onChange={e => onSearchChange(e.target.value)}
-            className="w-full py-1.5 pl-3 pr-7 text-[13px] bg-white border border-[#ddd] rounded-full outline-none focus:border-[#aaa] placeholder-[#bbb]"
-          />
-          {searchQuery && (
-            <button
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[#aaa] hover:text-[#555] text-sm leading-none"
-              onClick={() => onSearchChange('')}
-            >✕</button>
-          )}
-        </div>
+        <SearchInput onSubmit={onSearchSubmit} onClear={onSearchClear} />
       </div>
 
       {!isSearching && <div className="border-b border-[#ddd]">

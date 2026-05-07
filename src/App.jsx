@@ -46,7 +46,6 @@ export default function App() {
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
 
-  const [inputText, setInputText] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState([]);
   const [streamingText, setStreamingText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -58,7 +57,6 @@ export default function App() {
   const [reasoningEffort, setReasoningEffort] = useState(null);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const chatRef = useRef(null);
   const abortRef = useRef(null);
@@ -138,17 +136,14 @@ export default function App() {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [messages, streamingText, isConversationLoading]);
 
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults(null);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      const results = await searchConversations(searchQuery);
-      setSearchResults(results);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+  async function handleSearchSubmit(q) {
+    const results = await searchConversations(q);
+    setSearchResults(results);
+  }
+
+  function handleSearchClear() {
+    setSearchResults(null);
+  }
 
   function saveConfig() {
     const nextApiKey = apiKeyInput.trim();
@@ -469,8 +464,7 @@ export default function App() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  async function sendMessage() {
-    const text = inputText.trim();
+  async function sendMessage(text) {
     if (isStreaming || isConversationLoading) return;
     if (currentConversationId == null) return;
     if (!text && pendingAttachments.length === 0) return;
@@ -538,7 +532,6 @@ export default function App() {
       });
 
       consumePendingAttachments();
-      setInputText('');
 
       let fullText = '';
       for await (const chunk of result.textStream) {
@@ -582,10 +575,6 @@ export default function App() {
       setStreamingText('');
       setIsStreaming(false);
     }
-  }
-
-  function handleKeyDown(e) {
-    if (e.key === 'Enter') sendMessage();
   }
 
   function handleSetReasoningEffort(level) {
@@ -644,8 +633,8 @@ export default function App() {
         onSetReasoningEffort={handleSetReasoningEffort}
         onExport={handleExport}
         onImport={handleImport}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        onSearchSubmit={handleSearchSubmit}
+        onSearchClear={handleSearchClear}
         isSearching={searchResults !== null}
       />
 
@@ -661,13 +650,10 @@ export default function App() {
         />
 
         <ChatInput
-          inputText={inputText}
           pendingAttachments={pendingAttachments}
           isStreaming={isStreaming}
           isConversationLoading={isConversationLoading}
           fileInputRef={fileInputRef}
-          onInputChange={setInputText}
-          onKeyDown={handleKeyDown}
           onAddFiles={addFiles}
           onDragOver={handleFileDragOver}
           onDrop={handleFileDrop}
