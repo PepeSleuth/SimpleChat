@@ -67,9 +67,10 @@ export default function App() {
   const currentConv = conversations.find(c => c.id === currentConversationId);
   const defaultProject = projects.find(project => project.isDefault) ?? projects[0] ?? null;
   const selectedProject = projects.find(p => p.id === selectedProjectId) ?? projects[0] ?? null;
-  const filteredConversations = searchResults !== null
+  const filteredConversations = (searchResults !== null
     ? searchResults
-    : conversations.filter(c => c.projectId === selectedProject?.id);
+    : conversations.filter(c => c.projectId === selectedProject?.id)
+  ).slice().sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
   useEffect(() => {
     let cancelled = false;
