@@ -1,0 +1,74 @@
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+import MessageStats from './MessageStats';
+import MessageAttachments from './MessageAttachments';
+
+export default function ChatArea({
+  messages,
+  isStreaming,
+  isConversationLoading,
+  streamingText,
+  error,
+  chatRef,
+  onBranch,
+}) {
+  return (
+    <div className="flex-1 overflow-y-auto p-5" ref={chatRef}>
+      {messages.length === 0 && !isStreaming && !isConversationLoading && (
+        <div className="text-[#aaa] text-center mt-[60px] text-[15px]">Start a conversation</div>
+      )}
+
+      {messages.map((msg, i) => (
+        <div key={msg.id ?? i} className="group mb-5">
+          <div className={`text-xs font-bold uppercase tracking-[0.05em] mb-1 ${msg.role === 'user' ? 'text-black' : 'text-[#999]'}`}>
+            {msg.role === 'user' ? 'You' : 'AI'}
+          </div>
+          <div className="text-base leading-[1.6]">
+            {msg.role === 'assistant' ? (
+              <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.text}</ReactMarkdown>
+            ) : (
+              <>
+                {msg.text && <div className="whitespace-pre-wrap">{msg.text}</div>}
+                <MessageAttachments attachments={msg.attachments} />
+              </>
+            )}
+            {msg.role === 'assistant' && (
+              <>
+                <MessageStats stats={msg.stats} />
+                <button
+                  className="ml-[10px] py-[2px] px-[6px] text-xs bg-[#999] text-white border-none rounded-[3px] cursor-pointer invisible group-hover:visible align-middle hover:bg-[#777]"
+                  onClick={() => onBranch(i)}
+                >
+                  Branch
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {(isStreaming || isConversationLoading) && (
+        <div className="group mb-5">
+          <div className="text-xs font-bold uppercase tracking-[0.05em] mb-1 text-[#999]">AI</div>
+          <div className="text-base leading-[1.6]">
+            {isConversationLoading ? 'Loading conversation...' : (
+              <>
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{streamingText}</ReactMarkdown>
+                <span className="streaming"></span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-5">
+          <span className="text-[#c00] font-bold">Error: {error}</span>
+        </div>
+      )}
+    </div>
+  );
+}
