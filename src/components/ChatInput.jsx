@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import MessageAttachments from './MessageAttachments';
 
 export default function ChatInput({
@@ -17,6 +18,14 @@ export default function ChatInput({
   onStop,
 }) {
   const isInputDisabled = isStreaming || isConversationLoading;
+  const textareaRef = useRef(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+  }, [inputText]);
 
   return (
     <>
@@ -36,7 +45,7 @@ export default function ChatInput({
         </div>
       )}
 
-      <div className="flex border-t border-[#ddd] py-3 px-5 gap-[10px] bg-white items-center flex-wrap">
+      <div className="flex border-t border-[#ddd] py-3 px-5 gap-[10px] bg-white items-end flex-wrap">
         <label
           className={[
             'flex flex-col justify-center gap-[2px] m-0 py-[9px] px-[14px]',
@@ -58,10 +67,12 @@ export default function ChatInput({
           <span className="font-bold">Drop files here</span>
           <span className="text-[#666]">or click to browse</span>
         </label>
-        <input
-          type="text"
+        <textarea
+          ref={textareaRef}
+          rows={1}
           placeholder="Type your message here"
-          className="flex-1 min-w-[180px] py-[10px] px-3 text-base border border-[#ccc] outline-none focus:border-black"
+          className="flex-1 min-w-[180px] py-[10px] px-3 text-base border border-[#ccc] outline-none focus:border-black resize-none overflow-y-auto leading-normal"
+          style={{ maxHeight: '200px' }}
           value={inputText}
           onChange={e => onInputChange(e.target.value)}
           onKeyDown={onKeyDown}
