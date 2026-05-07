@@ -18,6 +18,7 @@ import {
   moveConversationToProject as moveConversationToProjectRecord,
   renameConversation as renameConversationRecord,
   renameProject as renameProjectRecord,
+  searchConversations,
   setSetting,
 } from './chatDb';
 import { downloadJson } from './lib/exportUtils';
@@ -57,6 +58,8 @@ export default function App() {
   const [reasoningEffort, setReasoningEffort] = useState(null);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
   const chatRef = useRef(null);
   const abortRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -66,7 +69,9 @@ export default function App() {
   const currentConv = conversations.find(c => c.id === currentConversationId);
   const defaultProject = projects.find(project => project.isDefault) ?? projects[0] ?? null;
   const selectedProject = projects.find(p => p.id === selectedProjectId) ?? projects[0] ?? null;
-  const filteredConversations = conversations.filter(c => c.projectId === selectedProject?.id);
+  const filteredConversations = searchResults !== null
+    ? searchResults
+    : conversations.filter(c => c.projectId === selectedProject?.id);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,6 +137,18 @@ export default function App() {
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [messages, streamingText, isConversationLoading]);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const results = await searchConversations(searchQuery);
+      setSearchResults(results);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   function saveConfig() {
     const nextApiKey = apiKeyInput.trim();
@@ -627,6 +644,9 @@ export default function App() {
         onSetReasoningEffort={handleSetReasoningEffort}
         onExport={handleExport}
         onImport={handleImport}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        isSearching={searchResults !== null}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">

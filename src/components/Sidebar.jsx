@@ -25,6 +25,9 @@ export default function Sidebar({
   onSetReasoningEffort,
   onExport,
   onImport,
+  searchQuery,
+  onSearchChange,
+  isSearching,
 }) {
   return (
     <aside className="w-60 shrink-0 flex flex-col bg-[#f5f5f5] border-r border-[#ddd]">
@@ -39,7 +42,25 @@ export default function Sidebar({
         </button>
       </div>
 
-      <div className="border-b border-[#ddd]">
+      <div className="px-2 py-2 border-b border-[#ddd]">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search conversations…"
+            value={searchQuery}
+            onChange={e => onSearchChange(e.target.value)}
+            className="w-full py-1.5 pl-3 pr-7 text-[13px] bg-white border border-[#ddd] rounded-full outline-none focus:border-[#aaa] placeholder-[#bbb]"
+          />
+          {searchQuery && (
+            <button
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[#aaa] hover:text-[#555] text-sm leading-none"
+              onClick={() => onSearchChange('')}
+            >✕</button>
+          )}
+        </div>
+      </div>
+
+      {!isSearching && <div className="border-b border-[#ddd]">
         {projects.map(project => {
           const isSelected = project.id === selectedProject?.id;
           return (
@@ -81,11 +102,11 @@ export default function Sidebar({
             </div>
           );
         })}
-      </div>
+      </div>}
 
       <nav className="flex-1 overflow-y-auto py-1">
         {filteredConversations.length === 0 ? (
-          <div className="py-[10px] px-3 text-[#999] text-[13px] italic">No conversations yet</div>
+          <div className="py-[10px] px-3 text-[#999] text-[13px] italic">{isSearching ? 'No matches found' : 'No conversations yet'}</div>
         ) : (
           filteredConversations.map(conv => {
             const isActive = conv.id === currentConversationId;
@@ -95,7 +116,14 @@ export default function Sidebar({
                 className={`group flex items-center justify-between py-2 px-3 cursor-pointer select-none gap-[6px] ${isActive ? 'bg-black text-white' : 'hover:bg-[#e8e8e8]'}`}
                 onClick={() => onOpenConversation(conv.id)}
               >
-                <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm">{conv.name}</span>
+                <span className="flex-1 overflow-hidden min-w-0">
+                  <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm">{conv.name}</span>
+                  {isSearching && (
+                    <span className="block text-[10px] overflow-hidden text-ellipsis whitespace-nowrap leading-none mt-[1px] opacity-50">
+                      {projects.find(p => p.id === conv.projectId)?.name ?? ''}
+                    </span>
+                  )}
+                </span>
                 <span className={`gap-[2px] shrink-0 ${isActive ? 'flex' : 'hidden group-hover:flex'}`}>
                   <button
                     className={`${convActionBase} hover:bg-white/15`}

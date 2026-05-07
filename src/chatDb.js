@@ -52,6 +52,26 @@ async function listConversations() {
   return conversations.sort((a, b) => a.id - b.id);
 }
 
+async function searchConversations(query) {
+  const lower = query.toLowerCase();
+  const byName = await db.conversations
+    .filter(c => c.name.toLowerCase().includes(lower))
+    .toArray();
+  const byNameIds = new Set(byName.map(c => c.id));
+
+  const matchingMsgs = await db.messages
+    .filter(m => (m.text ?? '').toLowerCase().includes(lower))
+    .toArray();
+  const msgConvIds = [...new Set(matchingMsgs.map(m => m.conversationId))]
+    .filter(id => !byNameIds.has(id));
+
+  const byMsg = msgConvIds.length
+    ? await db.conversations.where('id').anyOf(msgConvIds).toArray()
+    : [];
+
+  return [...byName, ...byMsg].sort((a, b) => b.id - a.id);
+}
+
 async function ensureDefaultProject() {
   const existing = await getDefaultProject();
   if (existing) return existing;
@@ -404,5 +424,6 @@ export {
   moveConversationToProject,
   renameConversation,
   renameProject,
+  searchConversations,
   setSetting,
 };
