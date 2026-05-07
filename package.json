@@ -9,6 +9,7 @@
     "@openrouter/ai-sdk-provider": "latest",
     "@tailwindcss/vite": "^4.2.4",
     "ai": "latest",
+    "dexie": "^4.4.2",
     "katex": "^0.16.45",
     "react": "latest",
     "react-dom": "latest",

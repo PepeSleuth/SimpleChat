@@ -239,6 +239,7 @@ export default function App() {
   const [modelPickerInput, setModelPickerInput] = useState('');
   const [reasoningEffort, setReasoningEffort] = useState(null);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
   const chatRef = useRef(null);
   const abortRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -247,6 +248,8 @@ export default function App() {
 
   const currentConv = conversations.find(c => c.id === currentConversationId);
   const defaultProject = projects.find(project => project.isDefault) ?? projects[0] ?? null;
+  const selectedProject = projects.find(p => p.id === selectedProjectId) ?? projects[0] ?? null;
+  const filteredConversations = conversations.filter(c => c.projectId === selectedProject?.id);
   const isInputDisabled = isStreaming || isConversationLoading;
 
   useEffect(() => {
@@ -393,6 +396,8 @@ export default function App() {
       if (seq !== loadSeqRef.current) return;
       setMessages(hydrateMessages(rawMessages));
       setCurrentConversationId(conversationId);
+      const conv = conversations.find(c => c.id === conversationId);
+      if (conv?.projectId) setSelectedProjectId(conv.projectId);
       await setSetting('currentConversationId', conversationId);
     } catch (err) {
       if (seq === loadSeqRef.current) setError(err.message || 'Failed to load conversation');
@@ -789,102 +794,91 @@ export default function App() {
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto pt-[10px] pb-2 flex flex-col gap-[10px]">
+        <div className="border-b border-[#ddd]">
           {projects.map(project => {
-            const projectConversations = conversations.filter(conv => conv.projectId === project.id);
-            const isActiveProject = currentConv?.projectId === project.id;
-
+            const isSelected = project.id === selectedProject?.id;
             return (
-              <section
+              <div
                 key={project.id}
-                className={`mx-2 border rounded-[14px] bg-[#fbfbfb] overflow-hidden ${isActiveProject ? 'border-[#cfcfcf] shadow-[0_0_0_1px_rgba(0,0,0,0.03)]' : 'border-[#e1e1e1]'}`}
+                className={`group flex items-center justify-between px-3 py-[7px] cursor-pointer select-none gap-2 ${isSelected ? 'bg-white' : 'hover:bg-[#ebebeb]'}`}
+                onClick={() => setSelectedProjectId(project.id)}
               >
-                <div className="flex items-center justify-between gap-2 pt-[10px] pr-[10px] pb-[9px] pl-3 bg-gradient-to-b from-[#fefefe] to-[#f5f5f5] border-b border-[#ececec]">
-                  <div className="flex items-center gap-[6px] min-w-0 flex-1">
-                    <span className="text-[13px] font-bold text-[#222] overflow-hidden text-ellipsis whitespace-nowrap">{project.name}</span>
-                    {project.isDefault && (
-                      <span className="text-[10px] uppercase tracking-[0.06em] text-[#777] border border-[#e0e0e0] rounded-full py-[2px] px-[6px] shrink-0">
-                        default
-                      </span>
-                    )}
-                    <span className="text-[10px] uppercase tracking-[0.06em] text-[#777] border border-[#e0e0e0] rounded-full py-[2px] px-[6px] shrink-0 ml-auto">
-                      {projectConversations.length}
-                    </span>
-                  </div>
-                  <div className="flex gap-1 shrink-0">
-                    <button
-                      className="m-0 py-1 px-[7px] text-xs bg-transparent text-[#444] border border-[#d1d1d1] cursor-pointer rounded-full hover:text-black hover:border-[#999] hover:bg-white"
-                      title="New conversation"
-                      onClick={() => newConversation(project.id)}
-                    >
-                      +
-                    </button>
-                    {!project.isDefault && (
-                      <>
-                        <button
-                          className="m-0 py-1 px-[7px] text-xs bg-transparent text-[#444] border border-[#d1d1d1] cursor-pointer rounded-full hover:text-black hover:border-[#999] hover:bg-white"
-                          title="Rename project"
-                          onClick={() => renameProject(project)}
-                        >
-                          ✎
-                        </button>
-                        <button
-                          className="m-0 py-1 px-[7px] text-xs bg-transparent text-[#444] border border-[#d1d1d1] cursor-pointer rounded-full hover:text-black hover:border-[#999] hover:bg-white hover:bg-[#c00] hover:text-white hover:border-[#c00]"
-                          title="Delete project"
-                          onClick={() => deleteProject(project)}
-                        >
-                          ✕
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="p-[6px]">
-                  {projectConversations.length === 0 ? (
-                    <div className="py-[10px] px-3 text-[#999] text-[13px] italic">No conversations yet</div>
-                  ) : (
-                    projectConversations.map(conv => {
-                      const isActive = conv.id === currentConversationId;
-                      return (
-                        <div
-                          key={conv.id}
-                          className={`group flex items-center justify-between py-2 px-3 cursor-pointer select-none gap-[6px] mb-1 pl-4 rounded-[10px] last:mb-0 ${isActive ? 'bg-black text-white' : 'hover:bg-[#e8e8e8]'}`}
-                          onClick={() => openConversation(conv.id)}
-                        >
-                          <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm">{conv.name}</span>
-                          <span className={`gap-[2px] shrink-0 ${isActive ? 'flex' : 'hidden group-hover:flex'}`}>
-                            <button
-                              className={`${convActionBase} hover:bg-white/15`}
-                              title="Move"
-                              onClick={e => { e.stopPropagation(); moveConversation(conv); }}
-                            >
-                              ↪
-                            </button>
-                            <button
-                              className={`${convActionBase} hover:bg-white/15`}
-                              title="Rename"
-                              onClick={e => { e.stopPropagation(); renameConversation(conv); }}
-                            >
-                              ✎
-                            </button>
-                            <button
-                              className={`${convActionBase} hover:bg-[#c00] hover:text-white hover:border-[#c00] disabled:opacity-25 disabled:cursor-not-allowed`}
-                              title="Delete"
-                              disabled={conversations.length <= 1}
-                              onClick={e => { e.stopPropagation(); deleteConversation(conv); }}
-                            >
-                              ✕
-                            </button>
-                          </span>
-                        </div>
-                      );
-                    })
+                <span className={`text-[13px] overflow-hidden text-ellipsis whitespace-nowrap flex-1 ${isSelected ? 'font-bold text-black' : 'text-[#555]'}`}>
+                  {project.name}
+                </span>
+                <div className="flex gap-1 shrink-0">
+                  <button
+                    className="m-0 py-1 px-[7px] text-xs bg-transparent text-[#444] border border-[#d1d1d1] cursor-pointer rounded-full hover:text-black hover:border-[#999] hover:bg-white"
+                    title="New conversation"
+                    onClick={e => { e.stopPropagation(); newConversation(project.id); }}
+                  >
+                    +
+                  </button>
+                  {!project.isDefault && (
+                    <>
+                      <button
+                        className="m-0 py-1 px-[7px] text-xs bg-transparent text-[#444] border border-[#d1d1d1] cursor-pointer rounded-full hover:text-black hover:border-[#999] hover:bg-white hidden group-hover:block"
+                        title="Rename project"
+                        onClick={e => { e.stopPropagation(); renameProject(project); }}
+                      >
+                        ✎
+                      </button>
+                      <button
+                        className="m-0 py-1 px-[7px] text-xs bg-transparent text-[#444] border border-[#d1d1d1] cursor-pointer rounded-full hover:bg-[#c00] hover:text-white hover:border-[#c00] hidden group-hover:block"
+                        title="Delete project"
+                        onClick={e => { e.stopPropagation(); deleteProject(project); }}
+                      >
+                        ✕
+                      </button>
+                    </>
                   )}
                 </div>
-              </section>
+              </div>
             );
           })}
+        </div>
+
+        <nav className="flex-1 overflow-y-auto py-1">
+          {filteredConversations.length === 0 ? (
+            <div className="py-[10px] px-3 text-[#999] text-[13px] italic">No conversations yet</div>
+          ) : (
+            filteredConversations.map(conv => {
+              const isActive = conv.id === currentConversationId;
+              return (
+                <div
+                  key={conv.id}
+                  className={`group flex items-center justify-between py-2 px-3 cursor-pointer select-none gap-[6px] ${isActive ? 'bg-black text-white' : 'hover:bg-[#e8e8e8]'}`}
+                  onClick={() => openConversation(conv.id)}
+                >
+                  <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm">{conv.name}</span>
+                  <span className={`gap-[2px] shrink-0 ${isActive ? 'flex' : 'hidden group-hover:flex'}`}>
+                    <button
+                      className={`${convActionBase} hover:bg-white/15`}
+                      title="Move"
+                      onClick={e => { e.stopPropagation(); moveConversation(conv); }}
+                    >
+                      ↪
+                    </button>
+                    <button
+                      className={`${convActionBase} hover:bg-white/15`}
+                      title="Rename"
+                      onClick={e => { e.stopPropagation(); renameConversation(conv); }}
+                    >
+                      ✎
+                    </button>
+                    <button
+                      className={`${convActionBase} hover:bg-[#c00] hover:text-white hover:border-[#c00] disabled:opacity-25 disabled:cursor-not-allowed`}
+                      title="Delete"
+                      disabled={conversations.length <= 1}
+                      onClick={e => { e.stopPropagation(); deleteConversation(conv); }}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                </div>
+              );
+            })
+          )}
         </nav>
 
         <div className="p-3 border-t border-[#ddd] flex flex-col gap-[6px]">
