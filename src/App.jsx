@@ -98,10 +98,10 @@ function MessageStats({ stats }) {
   ];
 
   return (
-    <div className="message-stats">
+    <div className="flex flex-wrap items-center gap-[6px] mt-[10px] pt-[6px] border-t border-[#eee] text-[11px] text-[#bbb] font-mono invisible group-hover:visible">
       {parts.map((part, i) => (
-        <span key={i} className="message-stat-segment">
-          {i > 0 && <span className="stats-sep">|</span>}
+        <span key={i} className="whitespace-nowrap overflow-hidden text-ellipsis max-w-[240px]">
+          {i > 0 && <span className="text-[#ddd] select-none max-w-none">|</span>}
           {part}
         </span>
       ))}
@@ -113,21 +113,21 @@ function MessageAttachments({ attachments = [], onRemove }) {
   if (!attachments.length) return null;
 
   return (
-    <div className="message-attachments">
+    <div className="flex flex-wrap gap-2 mt-[10px]">
       {attachments.map(attachment => (
         <div
           key={attachment.id}
-          className={`attachment-chip${attachment.kind === 'image' ? ' image' : ''}`}
+          className={`inline-flex gap-[10px] max-w-full py-2 px-[10px] border border-[#ddd] bg-[#fafafa] rounded-[10px] ${attachment.kind === 'image' ? 'items-start' : 'items-center'}`}
           title={attachment.name}
         >
           {attachment.kind === 'image' ? (
-            <img src={attachment.previewUrl} alt={attachment.name} className="attachment-thumb" />
+            <img src={attachment.previewUrl} alt={attachment.name} className="w-11 h-11 object-cover rounded-lg bg-[#eee] shrink-0" />
           ) : (
-            <span className="attachment-icon">📎</span>
+            <span className="inline-flex items-center justify-center w-11 h-11 rounded-lg bg-[#efefef] shrink-0 text-lg">📎</span>
           )}
-          <span className="attachment-meta">
-            <span className="attachment-name">{attachment.name}</span>
-            <span className="attachment-size">
+          <span className="min-w-0 flex flex-col gap-[2px]">
+            <span className="text-[13px] font-semibold text-[#222] overflow-hidden text-ellipsis whitespace-nowrap">{attachment.name}</span>
+            <span className="text-[11px] text-[#777] overflow-hidden text-ellipsis whitespace-nowrap">
               {formatFileSize(attachment.size)}
               {attachment.mimeType ? ` · ${attachment.mimeType}` : ''}
             </span>
@@ -135,7 +135,7 @@ function MessageAttachments({ attachments = [], onRemove }) {
           {onRemove && (
             <button
               type="button"
-              className="attachment-remove-btn"
+              className="ml-auto p-0 border-none bg-transparent text-[#888] cursor-pointer text-lg leading-none shrink-0 hover:text-black"
               onClick={() => onRemove(attachment.id)}
               aria-label={`Remove ${attachment.name}`}
             >
@@ -208,12 +208,6 @@ function makeDraftAttachment(file) {
   };
 }
 
-function hasFileDrag(dataTransfer) {
-  if (!dataTransfer) return false;
-  const types = Array.from(dataTransfer.types ?? []);
-  if (types.includes('Files')) return true;
-  return Array.from(dataTransfer.items ?? []).some(item => item.kind === 'file');
-}
 
 function createOpenRouterTools(openrouter) {
   return {
@@ -245,12 +239,9 @@ export default function App() {
   const [modelPickerInput, setModelPickerInput] = useState('');
   const [reasoningEffort, setReasoningEffort] = useState(null);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
-  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
-
   const chatRef = useRef(null);
   const abortRef = useRef(null);
   const fileInputRef = useRef(null);
-  const fileDragDepthRef = useRef(0);
   const loadSeqRef = useRef(0);
   const previousMessagesRef = useRef([]);
 
@@ -571,47 +562,15 @@ export default function App() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  function openFilePicker() {
-    if (isInputDisabled) return;
-    fileInputRef.current?.click();
-  }
-
-  function resetFileDragState() {
-    fileDragDepthRef.current = 0;
-    setIsDraggingFiles(false);
-  }
-
-  function handleFileDragEnter(e) {
-    if (isInputDisabled || !hasFileDrag(e.dataTransfer)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    fileDragDepthRef.current += 1;
-    setIsDraggingFiles(true);
-  }
-
   function handleFileDragOver(e) {
-    if (isInputDisabled || !hasFileDrag(e.dataTransfer)) return;
+    if (isInputDisabled) return;
     e.preventDefault();
-    e.stopPropagation();
     e.dataTransfer.dropEffect = 'copy';
-    setIsDraggingFiles(true);
-  }
-
-  function handleFileDragLeave(e) {
-    if (isInputDisabled || !hasFileDrag(e.dataTransfer)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    fileDragDepthRef.current = Math.max(0, fileDragDepthRef.current - 1);
-    if (fileDragDepthRef.current === 0) {
-      setIsDraggingFiles(false);
-    }
   }
 
   function handleFileDrop(e) {
     if (isInputDisabled) return;
     e.preventDefault();
-    e.stopPropagation();
-    resetFileDragState();
     addFiles(e.dataTransfer.files);
   }
 
@@ -764,75 +723,97 @@ export default function App() {
 
   if (isBootstrapping) {
     return (
-      <div id="loading-page">
-        <h1>SimpleChat</h1>
-        <p>Loading chats...</p>
+      <div className="max-w-[480px] mx-auto mt-[60px] px-5">
+        <h1 className="m-0 mb-2">SimpleChat</h1>
+        <p className="m-0 text-[#666]">Loading chats...</p>
       </div>
     );
   }
 
   if (!configured) {
     return (
-      <div id="setup-page">
+      <div className="max-w-[480px] mx-auto mt-[60px] px-5">
         <h1>SimpleChat</h1>
-        <div id="api-key-section">
+        <div className="my-5 p-5 border-2 border-black">
           <h3>API key:</h3>
           <p>Get one from <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">OpenRouter</a>.</p>
           <input
             type="password"
-            id="api-key"
             placeholder="sk-or-... or whatever"
+            className="w-full py-[10px] px-[10px] my-[10px] text-base border border-black"
             value={apiKeyInput}
             onChange={e => setApiKeyInput(e.target.value)}
           />
           <input
             type="text"
-            id="model"
             placeholder="Model name"
+            className="w-full py-[10px] px-[10px] my-[10px] text-base border border-black"
             value={modelInput}
             onChange={e => setModelInput(e.target.value)}
           />
-          <div className="setup-toggle-row">
-            <span>Web search</span>
+          <div className="flex items-center justify-between gap-3 my-[10px] text-[13px]">
+            <span className="text-[#444]">Web search</span>
             <button
               type="button"
-              className={`toggle-btn${webSearchEnabled ? ' active' : ''}`}
+              className={`m-0 py-1 px-2.5 text-xs border cursor-pointer capitalize min-w-[72px] ${webSearchEnabled ? 'bg-black text-white border-black' : 'bg-transparent text-[#555] border-[#ccc] hover:border-[#999] hover:text-black'}`}
               onClick={toggleWebSearch}
             >
               {webSearchEnabled ? 'on' : 'off'}
             </button>
           </div>
-          <button onClick={saveConfig}>Save</button>
+          <button
+            className="mt-[10px] py-[10px] px-5 text-base bg-black text-white border-none cursor-pointer hover:bg-[#333]"
+            onClick={saveConfig}
+          >
+            Save
+          </button>
         </div>
-        {error && <div className="error">Error: {error}</div>}
+        {error && <div className="text-[#c00] font-bold">Error: {error}</div>}
       </div>
     );
   }
 
+  const convActionBase = 'm-0 py-[2px] px-[5px] text-xs bg-transparent text-inherit border border-current cursor-pointer opacity-60 rounded-[3px] hover:opacity-100';
+
   return (
-    <div id="app-layout">
-      <aside id="sidebar">
-        <div id="sidebar-header">
-          <h1>SimpleChat</h1>
-          <button id="new-project-btn" onClick={newProject} title="New project">+ Project</button>
+    <div className="flex h-full">
+      <aside className="w-60 shrink-0 flex flex-col bg-[#f5f5f5] border-r border-[#ddd]">
+        <div className="flex items-center justify-between pt-4 px-3 pb-3 border-b border-[#ddd] gap-2">
+          <h1 className="m-0 text-lg leading-[1.2]">SimpleChat</h1>
+          <button
+            className="m-0 py-1.5 px-2.5 text-xs leading-none bg-black text-white border-none cursor-pointer shrink-0 rounded-full whitespace-nowrap hover:bg-[#333]"
+            onClick={newProject}
+            title="New project"
+          >
+            + Project
+          </button>
         </div>
 
-        <nav id="project-list">
+        <nav className="flex-1 overflow-y-auto pt-[10px] pb-2 flex flex-col gap-[10px]">
           {projects.map(project => {
             const projectConversations = conversations.filter(conv => conv.projectId === project.id);
             const isActiveProject = currentConv?.projectId === project.id;
 
             return (
-              <section key={project.id} className={`project-group${isActiveProject ? ' active' : ''}`}>
-                <div className="project-header">
-                  <div className="project-title">
-                    <span className="project-name">{project.name}</span>
-                    {project.isDefault && <span className="project-default-tag">default</span>}
-                    <span className="project-count">{projectConversations.length}</span>
+              <section
+                key={project.id}
+                className={`mx-2 border rounded-[14px] bg-[#fbfbfb] overflow-hidden ${isActiveProject ? 'border-[#cfcfcf] shadow-[0_0_0_1px_rgba(0,0,0,0.03)]' : 'border-[#e1e1e1]'}`}
+              >
+                <div className="flex items-center justify-between gap-2 pt-[10px] pr-[10px] pb-[9px] pl-3 bg-gradient-to-b from-[#fefefe] to-[#f5f5f5] border-b border-[#ececec]">
+                  <div className="flex items-center gap-[6px] min-w-0 flex-1">
+                    <span className="text-[13px] font-bold text-[#222] overflow-hidden text-ellipsis whitespace-nowrap">{project.name}</span>
+                    {project.isDefault && (
+                      <span className="text-[10px] uppercase tracking-[0.06em] text-[#777] border border-[#e0e0e0] rounded-full py-[2px] px-[6px] shrink-0">
+                        default
+                      </span>
+                    )}
+                    <span className="text-[10px] uppercase tracking-[0.06em] text-[#777] border border-[#e0e0e0] rounded-full py-[2px] px-[6px] shrink-0 ml-auto">
+                      {projectConversations.length}
+                    </span>
                   </div>
-                  <div className="project-actions">
+                  <div className="flex gap-1 shrink-0">
                     <button
-                      className="project-action-btn"
+                      className="m-0 py-1 px-[7px] text-xs bg-transparent text-[#444] border border-[#d1d1d1] cursor-pointer rounded-full hover:text-black hover:border-[#999] hover:bg-white"
                       title="New conversation"
                       onClick={() => newConversation(project.id)}
                     >
@@ -841,14 +822,14 @@ export default function App() {
                     {!project.isDefault && (
                       <>
                         <button
-                          className="project-action-btn"
+                          className="m-0 py-1 px-[7px] text-xs bg-transparent text-[#444] border border-[#d1d1d1] cursor-pointer rounded-full hover:text-black hover:border-[#999] hover:bg-white"
                           title="Rename project"
                           onClick={() => renameProject(project)}
                         >
                           ✎
                         </button>
                         <button
-                          className="project-action-btn delete"
+                          className="m-0 py-1 px-[7px] text-xs bg-transparent text-[#444] border border-[#d1d1d1] cursor-pointer rounded-full hover:text-black hover:border-[#999] hover:bg-white hover:bg-[#c00] hover:text-white hover:border-[#c00]"
                           title="Delete project"
                           onClick={() => deleteProject(project)}
                         >
@@ -859,43 +840,46 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="project-conversation-list">
+                <div className="p-[6px]">
                   {projectConversations.length === 0 ? (
-                    <div className="project-empty">No conversations yet</div>
+                    <div className="py-[10px] px-3 text-[#999] text-[13px] italic">No conversations yet</div>
                   ) : (
-                    projectConversations.map(conv => (
-                      <div
-                        key={conv.id}
-                        className={`conv-item project-conv-item${conv.id === currentConversationId ? ' active' : ''}`}
-                        onClick={() => openConversation(conv.id)}
-                      >
-                        <span className="conv-name">{conv.name}</span>
-                        <span className="conv-actions">
-                          <button
-                            className="conv-action-btn"
-                            title="Move"
-                            onClick={e => { e.stopPropagation(); moveConversation(conv); }}
-                          >
-                            ↪
-                          </button>
-                          <button
-                            className="conv-action-btn"
-                            title="Rename"
-                            onClick={e => { e.stopPropagation(); renameConversation(conv); }}
-                          >
-                            ✎
-                          </button>
-                          <button
-                            className="conv-action-btn delete"
-                            title="Delete"
-                            disabled={conversations.length <= 1}
-                            onClick={e => { e.stopPropagation(); deleteConversation(conv); }}
-                          >
-                            ✕
-                          </button>
-                        </span>
-                      </div>
-                    ))
+                    projectConversations.map(conv => {
+                      const isActive = conv.id === currentConversationId;
+                      return (
+                        <div
+                          key={conv.id}
+                          className={`group flex items-center justify-between py-2 px-3 cursor-pointer select-none gap-[6px] mb-1 pl-4 rounded-[10px] last:mb-0 ${isActive ? 'bg-black text-white' : 'hover:bg-[#e8e8e8]'}`}
+                          onClick={() => openConversation(conv.id)}
+                        >
+                          <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm">{conv.name}</span>
+                          <span className={`gap-[2px] shrink-0 ${isActive ? 'flex' : 'hidden group-hover:flex'}`}>
+                            <button
+                              className={`${convActionBase} hover:bg-white/15`}
+                              title="Move"
+                              onClick={e => { e.stopPropagation(); moveConversation(conv); }}
+                            >
+                              ↪
+                            </button>
+                            <button
+                              className={`${convActionBase} hover:bg-white/15`}
+                              title="Rename"
+                              onClick={e => { e.stopPropagation(); renameConversation(conv); }}
+                            >
+                              ✎
+                            </button>
+                            <button
+                              className={`${convActionBase} hover:bg-[#c00] hover:text-white hover:border-[#c00] disabled:opacity-25 disabled:cursor-not-allowed`}
+                              title="Delete"
+                              disabled={conversations.length <= 1}
+                              onClick={e => { e.stopPropagation(); deleteConversation(conv); }}
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </section>
@@ -903,27 +887,31 @@ export default function App() {
           })}
         </nav>
 
-        <div id="sidebar-footer">
-          <span id="model-label" title={model}>{model}</span>
-          <button id="change-model-btn" onClick={changeModel}>Change model</button>
-          <div id="web-search-row">
-            <span id="web-search-label">Web search</span>
+        <div className="p-3 border-t border-[#ddd] flex flex-col gap-[6px]">
+          <span className="text-xs text-[#666] overflow-hidden text-ellipsis whitespace-nowrap" title={model}>{model}</span>
+          <button
+            className="m-0 py-1.5 px-2.5 text-[13px] bg-black text-white border-none cursor-pointer w-full hover:bg-[#333]"
+            onClick={changeModel}
+          >
+            Change model
+          </button>
+          <div className="flex flex-col gap-1 mt-[2px]">
+            <span className="text-[11px] text-[#888] uppercase tracking-[0.05em]">Web search</span>
             <button
               type="button"
-              id="web-search-toggle"
-              className={webSearchEnabled ? 'active' : ''}
+              className={`m-0 py-1 px-2.5 text-xs border cursor-pointer capitalize ${webSearchEnabled ? 'bg-black text-white border-black' : 'bg-transparent text-[#555] border-[#ccc] hover:border-[#999] hover:text-black'}`}
               onClick={toggleWebSearch}
             >
               {webSearchEnabled ? 'on' : 'off'}
             </button>
           </div>
-          <div id="reasoning-row">
-            <span id="reasoning-label">Reasoning</span>
-            <div id="reasoning-btns">
+          <div className="flex flex-col gap-1 mt-[2px]">
+            <span className="text-[11px] text-[#888] uppercase tracking-[0.05em]">Reasoning</span>
+            <div className="flex gap-1">
               {[null, 'low', 'medium', 'high'].map(level => (
                 <button
                   key={level ?? 'off'}
-                  className={`reasoning-btn${reasoningEffort === level ? ' active' : ''}`}
+                  className={`flex-1 py-1 px-0 text-xs border cursor-pointer capitalize ${reasoningEffort === level ? 'bg-black text-white border-black' : 'bg-transparent text-[#555] border-[#ccc] hover:border-[#999] hover:text-black'}`}
                   onClick={() => {
                     setReasoningEffort(level);
                     setSetting('reasoningEffort', level);
@@ -937,28 +925,33 @@ export default function App() {
         </div>
       </aside>
 
-      <div id="main">
-        <div id="chat" ref={chatRef}>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-5" ref={chatRef}>
           {messages.length === 0 && !isStreaming && !isConversationLoading && (
-            <div id="empty-state">Start a conversation</div>
+            <div className="text-[#aaa] text-center mt-[60px] text-[15px]">Start a conversation</div>
           )}
 
           {messages.map((msg, i) => (
-            <div key={msg.id ?? i} className={`message ${msg.role}`}>
-              <div className="message-label">{msg.role === 'user' ? 'You' : 'AI'}</div>
-              <div className="message-content">
+            <div key={msg.id ?? i} className="group mb-5">
+              <div className={`text-xs font-bold uppercase tracking-[0.05em] mb-1 ${msg.role === 'user' ? 'text-black' : 'text-[#999]'}`}>
+                {msg.role === 'user' ? 'You' : 'AI'}
+              </div>
+              <div className="text-base leading-[1.6]">
                 {msg.role === 'assistant' ? (
                   <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.text}</ReactMarkdown>
                 ) : (
                   <>
-                    {msg.text && <div className="message-text">{msg.text}</div>}
+                    {msg.text && <div className="whitespace-pre-wrap">{msg.text}</div>}
                     <MessageAttachments attachments={msg.attachments} />
                   </>
                 )}
                 {msg.role === 'assistant' && (
                   <>
                     <MessageStats stats={msg.stats} />
-                    <button className="branch-btn" onClick={() => branchConversation(i)}>
+                    <button
+                      className="ml-[10px] py-[2px] px-[6px] text-xs bg-[#999] text-white border-none rounded-[3px] cursor-pointer invisible group-hover:visible align-middle hover:bg-[#777]"
+                      onClick={() => branchConversation(i)}
+                    >
                       Branch
                     </button>
                   </>
@@ -968,9 +961,9 @@ export default function App() {
           ))}
 
           {(isStreaming || isConversationLoading) && (
-            <div className="message assistant">
-              <div className="message-label">AI</div>
-              <div className="message-content">
+            <div className="group mb-5">
+              <div className="text-xs font-bold uppercase tracking-[0.05em] mb-1 text-[#999]">AI</div>
+              <div className="text-base leading-[1.6]">
                 {isConversationLoading ? 'Loading conversation...' : (
                   <>
                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{streamingText}</ReactMarkdown>
@@ -982,17 +975,21 @@ export default function App() {
           )}
 
           {error && (
-            <div className="message error-msg">
-              <span className="error">Error: {error}</span>
+            <div className="mb-5">
+              <span className="text-[#c00] font-bold">Error: {error}</span>
             </div>
           )}
         </div>
 
         {pendingAttachments.length > 0 && (
-        <div id="attachment-draft">
-            <div id="attachment-draft-header">
+          <div className="border-t border-[#eee] bg-[#fafafa] pt-3 px-5 pb-0">
+            <div className="flex items-center justify-between gap-[10px] mb-[10px] text-xs uppercase tracking-[0.05em] text-[#777]">
               <span>Attachments</span>
-              <button type="button" id="clear-attachments-btn" onClick={clearPendingAttachments}>
+              <button
+                type="button"
+                className="m-0 p-0 border-none bg-transparent text-[#555] cursor-pointer text-xs hover:text-black"
+                onClick={clearPendingAttachments}
+              >
                 Clear all
               </button>
             </div>
@@ -1000,77 +997,83 @@ export default function App() {
           </div>
         )}
 
-        <div id="input-row">
-          <input
-            ref={fileInputRef}
-            id="file-input"
-            type="file"
-            multiple
-            onChange={e => addFiles(e.target.files)}
-            disabled={isInputDisabled}
-          />
-          <div
-            id="file-dropzone"
-            className={isDraggingFiles ? 'dragging' : ''}
-            role="button"
-            tabIndex={isInputDisabled ? -1 : 0}
-            aria-label="Add files by dragging and dropping or clicking to browse"
-            aria-disabled={isInputDisabled}
-            onClick={openFilePicker}
-            onKeyDown={e => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                openFilePicker();
-              }
-            }}
-            onDragEnter={handleFileDragEnter}
+        <div className="flex border-t border-[#ddd] py-3 px-5 gap-[10px] bg-white items-center flex-wrap">
+          <label
+            className={[
+              'flex flex-col justify-center gap-[2px] m-0 py-[9px] px-[14px]',
+              'min-w-[170px] min-h-[46px] text-[13px] border border-dashed border-[#c8c8c8]',
+              'cursor-pointer shrink-0 select-none hover:border-black',
+              isInputDisabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : '',
+            ].join(' ')}
             onDragOver={handleFileDragOver}
-            onDragLeave={handleFileDragLeave}
             onDrop={handleFileDrop}
           >
-            <span className="file-dropzone-title">Drop files here</span>
-            <span className="file-dropzone-hint">or click to browse</span>
-          </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={e => addFiles(e.target.files)}
+              disabled={isInputDisabled}
+            />
+            <span className="font-bold">Drop files here</span>
+            <span className="text-[#666]">or click to browse</span>
+          </label>
           <input
             type="text"
-            id="input"
             placeholder="Type your message here"
+            className="flex-1 min-w-[180px] py-[10px] px-3 text-base border border-[#ccc] outline-none focus:border-black"
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isInputDisabled}
           />
-          <button id="send-btn" onClick={isStreaming ? stopStreaming : sendMessage}>
+          <button
+            className="m-0 py-[10px] px-5 text-base bg-black text-white border-none cursor-pointer shrink-0 hover:bg-[#333] disabled:bg-[#999] disabled:cursor-not-allowed"
+            onClick={isStreaming ? stopStreaming : sendMessage}
+          >
             {isStreaming ? 'Stop' : 'Send'}
           </button>
         </div>
       </div>
 
       {showModelPicker && (
-        <div id="model-picker-overlay" onClick={() => setShowModelPicker(false)}>
-          <div id="model-picker" onClick={e => e.stopPropagation()}>
-            <h3>Pick a model</h3>
-            <div id="model-picker-list">
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100]"
+          onClick={() => setShowModelPicker(false)}
+        >
+          <div
+            className="bg-white border-2 border-black p-5 w-[360px] max-h-[80vh] flex flex-col gap-3"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="m-0 text-[15px]">Pick a model</h3>
+            <div className="overflow-y-auto border border-[#ddd] flex-1">
               {MODEL_LIST.map(m => (
                 <div
                   key={m}
-                  className={`model-option${m === model ? ' selected' : ''}`}
+                  className={`py-[10px] px-3 text-sm cursor-pointer border-b border-[#f0f0f0] last:border-b-0 ${m === model ? 'bg-black text-white' : 'hover:bg-[#f5f5f5]'}`}
                   onClick={() => selectModel(m)}
                 >
                   {m}
                 </div>
               ))}
             </div>
-            <div id="model-picker-custom">
+            <div className="flex gap-2">
               <input
                 type="text"
                 placeholder="Or type a custom model…"
+                className="flex-1 py-2 px-[10px] text-sm border border-[#ccc] outline-none focus:border-black"
                 value={modelPickerInput}
                 onChange={e => setModelPickerInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') selectModel(modelPickerInput); }}
                 autoFocus
               />
-              <button onClick={() => selectModel(modelPickerInput)}>Use</button>
+              <button
+                className="py-2 px-[14px] text-sm bg-black text-white border-none cursor-pointer hover:bg-[#333]"
+                onClick={() => selectModel(modelPickerInput)}
+              >
+                Use
+              </button>
             </div>
           </div>
         </div>
