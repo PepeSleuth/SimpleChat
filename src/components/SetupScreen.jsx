@@ -28,16 +28,6 @@ export default function SetupScreen({
           value={modelInput}
           onChange={e => onModelChange(e.target.value)}
         />
-        <div className="flex items-center justify-between gap-3 my-[10px] text-[13px]">
-          <span className="text-[#444]">Web search</span>
-          <button
-            type="button"
-            className={`m-0 py-1 px-2.5 text-xs border cursor-pointer capitalize min-w-[72px] ${webSearchEnabled ? 'bg-black text-white border-black' : 'bg-transparent text-[#555] border-[#ccc] hover:border-[#999] hover:text-black'}`}
-            onClick={onToggleWebSearch}
-          >
-            {webSearchEnabled ? 'on' : 'off'}
-          </button>
-        </div>
         <button
           className="mt-[10px] py-[10px] px-5 text-base bg-black text-white border-none cursor-pointer hover:bg-[#333]"
           onClick={onSave}
