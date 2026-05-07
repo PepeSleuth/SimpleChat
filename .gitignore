@@ -2,4 +2,6 @@
 /dist
 .env
 .claude
+.codex
+.agents
 /data/imports
