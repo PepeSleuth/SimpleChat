@@ -1,25 +1,11 @@
 # SimpleChat
 
-A minimal, single-file HTML chat interface for AI models via OpenRouter API.
+FOSS AI Chat App wrapping OpenRouter.
 
 ## Features
 
-- **Single HTML file** - No build process, just open in browser
-- **Multiple conversations** - Create, rename, delete, and switch between chats
-- **Projects / folders** - Group conversations into lightweight projects from the sidebar
-- **Default "Unsorted" bucket** - Legacy or unfiled conversations stay in a fallback project
-- **Conversation branching** - Fork conversations at any AI response
-- **Real-time streaming** - See AI responses as they're generated
-- **Model switching** - Change AI models mid-conversation
-- **OpenRouter web search** - Enable or disable grounded web search per chat session
-- **File attachments** - Add images, PDFs, and other files to chat messages
-- **IndexedDB storage** - Conversations, settings, and attachments persist in browser
-
-## Planned Features
-
-- Long document support
-- Code block execution
-- Tool calls
-- Sticky UI elements
-- Server-side conversation storage
-- Conversation history search
+- Branching conversations
+- File uploads
+- Web search
+- Projects
+- JSON Import/Export
