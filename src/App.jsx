@@ -25,7 +25,7 @@ import ChatInput from './components/ChatInput';
 import ModelPicker from './components/ModelPicker';
 
 const MODEL_LIST = modelsRaw.split('\n').map(l => l.trim()).filter(Boolean);
-const DEFAULT_MODEL = 'meta-llama/llama-3.2-1b-instruct';
+const DEFAULT_MODEL = 'openai/gpt-5.4-nano';
 
 export default function App() {
   const [apiKey, setApiKey] = useState('');

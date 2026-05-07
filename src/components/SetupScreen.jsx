@@ -16,7 +16,7 @@ export default function SetupScreen({
         <p>Get one from <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">OpenRouter</a>.</p>
         <input
           type="password"
-          placeholder="sk-or-... or whatever"
+          placeholder="sk-or-..."
           className="w-full py-[10px] px-[10px] my-[10px] text-base border border-black"
           value={apiKeyInput}
           onChange={e => onApiKeyChange(e.target.value)}
