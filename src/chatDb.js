@@ -215,6 +215,48 @@ async function appendMessage({ conversationId, role, text, stats = null, attachm
   });
 }
 
+async function updateMessageText(messageId, text) {
+  const now = new Date().toISOString();
+  return db.transaction('rw', [db.conversations, db.messages], async () => {
+    const message = await db.messages.get(messageId);
+    if (!message) return null;
+
+    const updatedMessage = { ...message, text };
+    await db.messages.put(updatedMessage);
+
+    const conversation = await db.conversations.get(message.conversationId);
+    if (conversation) {
+      await db.conversations.put({ ...conversation, updatedAt: now });
+    }
+
+    return updatedMessage;
+  });
+}
+
+async function deleteMessagesAfter(conversationId, messageId) {
+  const now = new Date().toISOString();
+  return db.transaction('rw', [db.conversations, db.messages, db.attachments], async () => {
+    const messagesToDelete = await db.messages
+      .where('conversationId')
+      .equals(conversationId)
+      .filter(message => message.id > messageId)
+      .toArray();
+    const messageIds = messagesToDelete.map(message => message.id);
+
+    if (messageIds.length) {
+      await db.attachments.where('messageId').anyOf(messageIds).delete();
+      await db.messages.bulkDelete(messageIds);
+    }
+
+    const conversation = await db.conversations.get(conversationId);
+    if (conversation) {
+      await db.conversations.put({ ...conversation, updatedAt: now });
+    }
+
+    return messageIds;
+  });
+}
+
 async function duplicateConversationFromMessages({ name, messages, projectId = null }) {
   const now = new Date().toISOString();
   const targetProjectId = projectId ?? (await ensureDefaultProject()).id;
@@ -413,6 +455,7 @@ export {
   createProject,
   createConversation,
   deleteConversation,
+  deleteMessagesAfter,
   deleteProject,
   duplicateConversationFromMessages,
   exportAllData,
@@ -426,4 +469,5 @@ export {
   renameProject,
   searchConversations,
   setSetting,
+  updateMessageText,
 };

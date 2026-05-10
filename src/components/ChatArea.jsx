@@ -14,7 +14,11 @@ export default function ChatArea({
   error,
   chatRef,
   onBranch,
+  onEdit,
+  onCopy,
 }) {
+  const actionButtonClass = 'py-[2px] px-[6px] text-xs bg-[#999] text-white border-none rounded-[3px] cursor-pointer hover:bg-[#777]';
+
   return (
     <div className="flex-1 overflow-y-auto p-5" ref={chatRef}>
       {messages.length === 0 && !isStreaming && !isConversationLoading && (
@@ -35,16 +39,45 @@ export default function ChatArea({
                 <MessageAttachments attachments={msg.attachments} />
               </>
             )}
-            {msg.role === 'assistant' && (
+            {msg.role === 'assistant' ? (
               <>
                 <MessageStats stats={msg.stats} />
-                <button
-                  className="ml-[10px] py-[2px] px-[6px] text-xs bg-[#999] text-white border-none rounded-[3px] cursor-pointer invisible group-hover:visible align-middle hover:bg-[#777]"
-                  onClick={() => onBranch(i)}
-                >
-                  Branch
-                </button>
+                <div className="mt-1 flex items-center gap-[6px] invisible group-hover:visible">
+                  <button
+                    className={actionButtonClass}
+                    onClick={() => onEdit(i)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className={actionButtonClass}
+                    onClick={() => onCopy(i)}
+                  >
+                    Copy
+                  </button>
+                  <button
+                    className={actionButtonClass}
+                    onClick={() => onBranch(i)}
+                  >
+                    Branch
+                  </button>
+                </div>
               </>
+            ) : (
+              <div className="mt-1 flex items-center gap-[6px] invisible group-hover:visible">
+                <button
+                  className={actionButtonClass}
+                  onClick={() => onEdit(i)}
+                >
+                  Edit
+                </button>
+                <button
+                  className={actionButtonClass}
+                  onClick={() => onCopy(i)}
+                >
+                  Copy
+                </button>
+              </div>
             )}
           </div>
         </div>

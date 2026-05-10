@@ -22,13 +22,22 @@ export default function AppDialog({ dialog, onCancel, onSubmit }) {
 
         {dialog.type === 'text' && (
           <form className="flex flex-col gap-3" onSubmit={handleTextSubmit}>
-            <input
-              name="value"
-              type="text"
-              defaultValue={dialog.initialValue ?? ''}
-              className="w-full py-2 px-[10px] text-sm border border-[#ccc] outline-none focus:border-black"
-              autoFocus
-            />
+            {dialog.multiline ? (
+              <textarea
+                name="value"
+                defaultValue={dialog.initialValue ?? ''}
+                className="w-full min-h-[180px] py-2 px-[10px] text-sm leading-[1.5] border border-[#ccc] outline-none resize-y focus:border-black"
+                autoFocus
+              />
+            ) : (
+              <input
+                name="value"
+                type="text"
+                defaultValue={dialog.initialValue ?? ''}
+                className="w-full py-2 px-[10px] text-sm border border-[#ccc] outline-none focus:border-black"
+                autoFocus
+              />
+            )}
             <div className="flex justify-end gap-2">
               <button type="button" className="py-2 px-[14px] text-sm bg-transparent border border-[#ccc] cursor-pointer hover:border-[#999]" onClick={onCancel}>
                 {cancelLabel}

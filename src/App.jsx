@@ -5,6 +5,7 @@ import {
   createProject,
   createConversation,
   deleteConversation as deleteConversationRecord,
+  deleteMessagesAfter,
   deleteProject as deleteProjectRecord,
   duplicateConversationFromMessages,
   exportAllData,
@@ -18,6 +19,7 @@ import {
   renameProject as renameProjectRecord,
   searchConversations,
   setSetting,
+  updateMessageText,
 } from './chatDb';
 import { downloadJson } from './lib/exportUtils';
 import { hydrateMessages, releaseAttachmentUrls, makeDraftAttachment } from './lib/attachments';
@@ -398,6 +400,84 @@ export default function App() {
     }
   }
 
+  async function editMessage(messageIndex) {
+    if (isStreaming || isConversationLoading) return;
+    if (currentConversationId == null) return;
+    const message = messages[messageIndex];
+    if (!message?.id) return;
+
+    const nextText = await promptText({
+      title: `Edit ${message.role === 'assistant' ? 'AI' : 'your'} message`,
+      initialValue: message.text ?? '',
+      submitLabel: 'Save',
+      multiline: true,
+    });
+    if (nextText == null || nextText === (message.text ?? '')) return;
+
+    try {
+      const updatedMessage = await updateMessageText(message.id, nextText);
+      if (!updatedMessage) return;
+      await deleteMessagesAfter(currentConversationId, message.id);
+
+      const editedMessage = { ...message, text: updatedMessage.text ?? '' };
+      const nextMessages = [
+        ...messages.slice(0, messageIndex),
+        editedMessage,
+      ];
+
+      setError('');
+      setMessages(nextMessages);
+      setConversations(await listConversations());
+
+      if (editedMessage.role === 'user') {
+        setStreamingText('');
+        setIsStreaming(true);
+        try {
+          await appendAssistantResponse({
+            conversationId: currentConversationId,
+            contextMessages: nextMessages,
+          });
+        } finally {
+          abortRef.current = null;
+          setStreamingText('');
+          setIsStreaming(false);
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        setError(err.message || 'Failed to edit message');
+      }
+      abortRef.current = null;
+      setStreamingText('');
+      setIsStreaming(false);
+    }
+  }
+
+  async function copyMessage(messageIndex) {
+    const message = messages[messageIndex];
+    const text = message?.text ?? '';
+    if (!text) return;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    } catch (err) {
+      setError(err.message || 'Failed to copy message');
+    }
+  }
+
   async function handleExport() {
     try {
       const data = await exportAllData();
@@ -468,6 +548,36 @@ export default function App() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
+  async function appendAssistantResponse({ conversationId, contextMessages }) {
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const assistantResponse = await streamOpenRouterChat({
+      apiKey,
+      model,
+      messages: contextMessages,
+      reasoningEffort,
+      webSearchEnabled,
+      abortSignal: controller.signal,
+      onText: setStreamingText,
+    });
+    const assistantRecord = await appendMessage({
+      conversationId,
+      role: 'assistant',
+      text: assistantResponse.text,
+      stats: assistantResponse.stats,
+    });
+
+    setMessages(prev => [...prev, {
+      id: assistantRecord.id,
+      role: 'assistant',
+      text: assistantResponse.text,
+      stats: assistantRecord.stats,
+      createdAt: assistantRecord.createdAt,
+      attachments: [],
+    }]);
+  }
+
   async function sendMessage(text) {
     if (isStreaming || isConversationLoading) return;
     if (currentConversationId == null) return;
@@ -481,9 +591,6 @@ export default function App() {
     setIsStreaming(true);
 
     try {
-      const controller = new AbortController();
-      abortRef.current = controller;
-
       const userRecord = await appendMessage({
         conversationId: currentConversationId,
         role: 'user',
@@ -521,30 +628,10 @@ export default function App() {
       }
 
       consumePendingAttachments();
-      const assistantResponse = await streamOpenRouterChat({
-        apiKey,
-        model,
-        messages: [...draftMessages, userMessage],
-        reasoningEffort,
-        webSearchEnabled,
-        abortSignal: controller.signal,
-        onText: setStreamingText,
-      });
-      const assistantRecord = await appendMessage({
+      await appendAssistantResponse({
         conversationId: currentConversationId,
-        role: 'assistant',
-        text: assistantResponse.text,
-        stats: assistantResponse.stats,
+        contextMessages: [...draftMessages, userMessage],
       });
-
-      setMessages(prev => [...prev, {
-        id: assistantRecord.id,
-        role: 'assistant',
-        text: assistantResponse.text,
-        stats: assistantRecord.stats,
-        createdAt: assistantRecord.createdAt,
-        attachments: [],
-      }]);
     } catch (err) {
       if (err.name !== 'AbortError') {
         setError(err.message || 'Unknown error');
@@ -620,6 +707,8 @@ export default function App() {
           error={error}
           chatRef={chatRef}
           onBranch={branchConversation}
+          onEdit={editMessage}
+          onCopy={copyMessage}
         />
 
         <ChatInput
