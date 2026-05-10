@@ -9,7 +9,10 @@ export default function MessageStats({ stats }) {
     <span key="model" title={stats.model}>{stats.model}</span>,
     <span key="date">{date}</span>,
     ...(stats.totalTokens != null ? [
-      <span key="tokens" title={`${stats.promptTokens} prompt + ${stats.completionTokens} completion`}>
+      <span
+        key="tokens"
+        title={`${stats.promptTokens} prompt + ${stats.completionTokens} completion${stats.reasoningTokens != null ? ` (${stats.reasoningTokens} reasoning)` : ''}`}
+      >
         {stats.totalTokens} tokens
       </span>,
     ] : []),
@@ -22,13 +25,15 @@ export default function MessageStats({ stats }) {
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-[6px] mt-[10px] pt-[6px] border-t border-[#30363d] text-[11px] text-[#6e7681] font-mono invisible group-hover:visible">
-      {parts.map((part, i) => (
-        <span key={i} className="whitespace-nowrap overflow-hidden text-ellipsis max-w-[240px]">
-          {i > 0 && <span className="text-[#484f58] select-none max-w-none">|</span>}
-          {part}
-        </span>
-      ))}
+    <div className="mt-[10px] pt-[6px] border-t border-[#30363d] text-[11px] text-[#6e7681] font-mono invisible group-hover:visible">
+      <div className="flex flex-wrap items-center gap-[6px]">
+        {parts.map((part, i) => (
+          <span key={i} className="whitespace-nowrap overflow-hidden text-ellipsis max-w-[240px]">
+            {i > 0 && <span className="text-[#484f58] select-none max-w-none">|</span>}
+            {part}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

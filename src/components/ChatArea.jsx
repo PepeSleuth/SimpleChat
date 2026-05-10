@@ -5,12 +5,15 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import MessageStats from './MessageStats';
 import MessageAttachments from './MessageAttachments';
+import ReasoningAccordion from './ReasoningAccordion';
 
 export default function ChatArea({
   messages,
   isStreaming,
   isConversationLoading,
   streamingText,
+  streamingReasoningText,
+  reasoningEffort,
   error,
   chatRef,
   onBranch,
@@ -32,7 +35,10 @@ export default function ChatArea({
           </div>
           <div className="text-base leading-[1.6]">
             {msg.role === 'assistant' ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.text}</ReactMarkdown>
+              <>
+                <ReasoningAccordion stats={msg.stats} />
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.text}</ReactMarkdown>
+              </>
             ) : (
               <>
                 {msg.text && <div className="whitespace-pre-wrap">{msg.text}</div>}
@@ -89,6 +95,7 @@ export default function ChatArea({
           <div className="text-base leading-[1.6]">
             {isConversationLoading ? 'Loading conversation...' : (
               <>
+                <ReasoningAccordion reasoningText={streamingReasoningText} reasoningEffort={reasoningEffort} />
                 <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{streamingText}</ReactMarkdown>
                 <span className="streaming"></span>
               </>

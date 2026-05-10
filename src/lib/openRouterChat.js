@@ -18,6 +18,7 @@ export async function streamOpenRouterChat({
   webSearchEnabled,
   abortSignal,
   onText,
+  onReasoningText,
 }) {
   const openrouter = createOpenRouter({ apiKey });
   const modelOptions = {
@@ -34,20 +35,30 @@ export async function streamOpenRouterChat({
   });
 
   let text = '';
-  for await (const chunk of result.textStream) {
-    text += chunk;
-    onText(text);
+  let reasoningText = '';
+  for await (const chunk of result.fullStream) {
+    if (chunk.type === 'text-delta') {
+      text += chunk.text;
+      onText(text);
+    } else if (chunk.type === 'reasoning-delta') {
+      reasoningText += chunk.text;
+      onReasoningText?.(reasoningText);
+    }
   }
 
   const usage = await result.usage;
   const providerMeta = await result.providerMetadata ?? await result.experimental_providerMetadata;
   const openRouterUsage = getOpenRouterUsage(providerMeta);
+  const reasoningTokens = usage?.outputTokenDetails?.reasoningTokens ?? usage?.reasoningTokens ?? null;
 
   return {
     text,
     stats: {
       date: new Date().toISOString(),
       model,
+      reasoningEffort: reasoningEffort ?? null,
+      reasoningTokens,
+      reasoningText: reasoningText || null,
       promptTokens: usage?.promptTokens,
       completionTokens: usage?.completionTokens,
       totalTokens: usage?.totalTokens,

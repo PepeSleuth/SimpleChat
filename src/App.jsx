@@ -50,6 +50,7 @@ export default function App() {
 
   const [pendingAttachments, setPendingAttachments] = useState([]);
   const [streamingText, setStreamingText] = useState('');
+  const [streamingReasoningText, setStreamingReasoningText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [isConversationLoading, setIsConversationLoading] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
@@ -576,6 +577,7 @@ export default function App() {
       webSearchEnabled,
       abortSignal: controller.signal,
       onText: setStreamingText,
+      onReasoningText: setStreamingReasoningText,
     });
     const assistantRecord = await appendMessage({
       conversationId,
@@ -604,6 +606,7 @@ export default function App() {
 
     setError('');
     setStreamingText('');
+    setStreamingReasoningText('');
     setIsStreaming(true);
 
     try {
@@ -655,6 +658,7 @@ export default function App() {
     } finally {
       abortRef.current = null;
       setStreamingText('');
+      setStreamingReasoningText('');
       setIsStreaming(false);
     }
   }
@@ -721,6 +725,8 @@ export default function App() {
           isStreaming={isStreaming}
           isConversationLoading={isConversationLoading}
           streamingText={streamingText}
+          streamingReasoningText={streamingReasoningText}
+          reasoningEffort={reasoningEffort}
           error={error}
           chatRef={chatRef}
           onBranch={branchConversation}
