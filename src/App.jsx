@@ -141,10 +141,6 @@ export default function App() {
     }
   }, [currentConversationId]);
 
-  useEffect(() => {
-    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [messages, streamingText, isConversationLoading]);
-
   async function handleSearchSubmit(q) {
     const results = await searchConversations(q);
     setSearchResults(results);
