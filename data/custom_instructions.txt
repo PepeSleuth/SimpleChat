@@ -1,0 +1,2 @@
+- Always respond in English, unless explicitly prompted otherwise
+- I am aware that LLMs have a knowledge cutoff date, no need to remind me

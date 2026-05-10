@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
-const convActionBase = 'm-0 py-[2px] px-[5px] text-xs bg-transparent text-inherit border border-current cursor-pointer opacity-60 rounded-[3px] hover:opacity-100';
-const projectActionClass = 'm-0 py-1 px-[7px] text-xs bg-transparent text-[#444] border border-[#d1d1d1] cursor-pointer rounded-full hover:text-black hover:border-[#999] hover:bg-white';
+const convActionBase = 'm-0 py-[2px] px-[5px] text-xs bg-transparent text-inherit border border-current cursor-pointer opacity-70 rounded-[3px] hover:opacity-100';
+const projectActionClass = 'm-0 py-1 px-[7px] text-xs bg-transparent text-[#c9d1d9] border border-[#30363d] cursor-pointer rounded-full hover:text-white hover:border-[#8b949e] hover:bg-[#21262d]';
 
 function SearchInput({ onSubmit, onClear }) {
   const [value, setValue] = useState('');
@@ -13,11 +13,11 @@ function SearchInput({ onSubmit, onClear }) {
         value={value}
         onChange={e => setValue(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') onSubmit(value); }}
-        className="w-full py-1.5 pl-3 pr-7 text-[13px] bg-white border border-[#ddd] rounded-full outline-none focus:border-[#aaa] placeholder-[#bbb]"
+        className="w-full py-1.5 pl-3 pr-7 text-[13px] bg-[#0d1117] text-[#e6edf3] border border-[#30363d] rounded-full outline-none focus:border-[#8b949e] placeholder-[#6e7681]"
       />
       {value && (
         <button
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-[#aaa] hover:text-[#555] text-sm leading-none"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8b949e] hover:text-[#f0f6fc] text-sm leading-none"
           onClick={() => { setValue(''); onClear(); }}
         >x</button>
       )}
@@ -29,16 +29,16 @@ function ProjectList({ projects, actions }) {
   if (projects.isSearching) return null;
 
   return (
-    <div className="border-b border-[#ddd]">
+    <div className="border-b border-[#30363d]">
       {projects.items.map(project => {
         const isSelected = project.id === projects.selected?.id;
         return (
           <div
             key={project.id}
-            className={`group flex items-center justify-between px-3 py-[7px] cursor-pointer select-none gap-2 ${isSelected ? 'bg-white' : 'hover:bg-[#ebebeb]'}`}
+            className={`group flex items-center justify-between px-3 py-[7px] cursor-pointer select-none gap-2 ${isSelected ? 'bg-[#21262d]' : 'hover:bg-[#161b22]'}`}
             onClick={() => actions.selectProject(project.id)}
           >
-            <span className={`text-[13px] overflow-hidden text-ellipsis whitespace-nowrap flex-1 ${isSelected ? 'font-bold text-black' : 'text-[#555]'}`}>
+            <span className={`text-[13px] overflow-hidden text-ellipsis whitespace-nowrap flex-1 ${isSelected ? 'font-bold text-[#f0f6fc]' : 'text-[#9da7b3]'}`}>
               {project.name}
             </span>
             <div className="flex gap-1 shrink-0">
@@ -59,7 +59,7 @@ function ProjectList({ projects, actions }) {
                     Edit
                   </button>
                   <button
-                    className={`${projectActionClass} hidden group-hover:block hover:bg-[#c00] hover:text-white hover:border-[#c00]`}
+                    className={`${projectActionClass} hidden group-hover:block hover:bg-[#da3633] hover:text-white hover:border-[#da3633]`}
                     title="Delete project"
                     onClick={e => { e.stopPropagation(); actions.deleteProject(project); }}
                   >
@@ -79,7 +79,7 @@ function ConversationList({ projects, conversations, actions }) {
   return (
     <nav className="flex-1 overflow-y-auto py-1">
       {conversations.filtered.length === 0 ? (
-        <div className="py-[10px] px-3 text-[#999] text-[13px] italic">
+        <div className="py-[10px] px-3 text-[#6e7681] text-[13px] italic">
           {projects.isSearching ? 'No matches found' : 'No conversations yet'}
         </div>
       ) : (
@@ -88,7 +88,7 @@ function ConversationList({ projects, conversations, actions }) {
           return (
             <div
               key={conv.id}
-              className={`group flex items-center justify-between py-2 px-3 cursor-pointer select-none gap-[6px] ${isActive ? 'bg-black text-white' : 'hover:bg-[#e8e8e8]'}`}
+              className={`group flex items-center justify-between py-2 px-3 cursor-pointer select-none gap-[6px] ${isActive ? 'bg-[#f0f6fc] text-[#0d1117]' : 'hover:bg-[#161b22]'}`}
               onClick={() => actions.openConversation(conv.id)}
             >
               <span className="flex-1 overflow-hidden min-w-0">
@@ -115,7 +115,7 @@ function ConversationList({ projects, conversations, actions }) {
                   Edit
                 </button>
                 <button
-                  className={`${convActionBase} hover:bg-[#c00] hover:text-white hover:border-[#c00] disabled:opacity-25 disabled:cursor-not-allowed`}
+                  className={`${convActionBase} hover:bg-[#da3633] hover:text-white hover:border-[#da3633] disabled:opacity-25 disabled:cursor-not-allowed`}
                   title="Delete"
                   disabled={conversations.items.length <= 1}
                   onClick={e => { e.stopPropagation(); actions.deleteConversation(conv); }}
@@ -133,31 +133,31 @@ function ConversationList({ projects, conversations, actions }) {
 
 function SidebarSettings({ settings, actions }) {
   return (
-    <div className="p-3 border-t border-[#ddd] flex flex-col gap-[6px]">
-      <span className="text-xs text-[#666] overflow-hidden text-ellipsis whitespace-nowrap" title={settings.model}>{settings.model}</span>
+    <div className="p-3 border-t border-[#30363d] flex flex-col gap-[6px]">
+      <span className="text-xs text-[#9da7b3] overflow-hidden text-ellipsis whitespace-nowrap" title={settings.model}>{settings.model}</span>
       <button
-        className="m-0 py-1.5 px-2.5 text-[13px] bg-black text-white border-none cursor-pointer w-full hover:bg-[#333]"
+        className="m-0 py-1.5 px-2.5 text-[13px] bg-[#f0f6fc] text-[#0d1117] border-none cursor-pointer w-full hover:bg-[#c9d1d9]"
         onClick={actions.changeModel}
       >
         Change model
       </button>
       <div className="flex flex-col gap-1 mt-[2px]">
-        <span className="text-[11px] text-[#888] uppercase tracking-[0.05em]">Web search</span>
+        <span className="text-[11px] text-[#8b949e] uppercase tracking-[0.05em]">Web search</span>
         <button
           type="button"
-          className={`m-0 py-1 px-2.5 text-xs border cursor-pointer capitalize ${settings.webSearchEnabled ? 'bg-black text-white border-black' : 'bg-transparent text-[#555] border-[#ccc] hover:border-[#999] hover:text-black'}`}
+          className={`m-0 py-1 px-2.5 text-xs border cursor-pointer capitalize ${settings.webSearchEnabled ? 'bg-[#f0f6fc] text-[#0d1117] border-[#f0f6fc]' : 'bg-transparent text-[#9da7b3] border-[#30363d] hover:border-[#8b949e] hover:text-[#f0f6fc]'}`}
           onClick={actions.toggleWebSearch}
         >
           {settings.webSearchEnabled ? 'on' : 'off'}
         </button>
       </div>
       <div className="flex flex-col gap-1 mt-[2px]">
-        <span className="text-[11px] text-[#888] uppercase tracking-[0.05em]">Reasoning</span>
+        <span className="text-[11px] text-[#8b949e] uppercase tracking-[0.05em]">Reasoning</span>
         <div className="flex gap-1">
           {[null, 'low', 'medium', 'high'].map(level => (
             <button
               key={level ?? 'off'}
-              className={`flex-1 py-1 px-0 text-xs border cursor-pointer capitalize ${settings.reasoningEffort === level ? 'bg-black text-white border-black' : 'bg-transparent text-[#555] border-[#ccc] hover:border-[#999] hover:text-black'}`}
+              className={`flex-1 py-1 px-0 text-xs border cursor-pointer capitalize ${settings.reasoningEffort === level ? 'bg-[#f0f6fc] text-[#0d1117] border-[#f0f6fc]' : 'bg-transparent text-[#9da7b3] border-[#30363d] hover:border-[#8b949e] hover:text-[#f0f6fc]'}`}
               onClick={() => actions.setReasoningEffort(level)}
             >
               {level ?? 'off'}
@@ -165,16 +165,16 @@ function SidebarSettings({ settings, actions }) {
           ))}
         </div>
       </div>
-      <div className="flex flex-col gap-1 mt-[2px] pt-2 border-t border-[#eee]">
-        <span className="text-[11px] text-[#888] uppercase tracking-[0.05em]">Chat management (plain text)</span>
+      <div className="flex flex-col gap-1 mt-[2px] pt-2 border-t border-[#30363d]">
+        <span className="text-[11px] text-[#8b949e] uppercase tracking-[0.05em]">Chat management (plain text)</span>
         <div className="flex gap-1">
           <button
-            className="flex-1 py-1 px-0 text-xs bg-transparent text-[#555] border border-[#ccc] cursor-pointer hover:border-[#999] hover:text-black"
+            className="flex-1 py-1 px-0 text-xs bg-transparent text-[#9da7b3] border border-[#30363d] cursor-pointer hover:border-[#8b949e] hover:text-[#f0f6fc]"
             onClick={actions.exportData}
           >
             Export
           </button>
-          <label className="flex-1 py-1 px-0 text-xs bg-transparent text-[#555] border border-[#ccc] cursor-pointer hover:border-[#999] hover:text-black text-center">
+          <label className="flex-1 py-1 px-0 text-xs bg-transparent text-[#9da7b3] border border-[#30363d] cursor-pointer hover:border-[#8b949e] hover:text-[#f0f6fc] text-center">
             Import
             <input
               type="file"
@@ -191,11 +191,11 @@ function SidebarSettings({ settings, actions }) {
 
 export default function Sidebar({ projects, conversations, settings, actions }) {
   return (
-    <aside className="w-60 shrink-0 flex flex-col bg-[#f5f5f5] border-r border-[#ddd]">
-      <div className="flex items-center justify-between pt-4 px-3 pb-3 border-b border-[#ddd] gap-2">
+    <aside className="w-60 shrink-0 flex flex-col bg-[#010409] border-r border-[#30363d]">
+      <div className="flex items-center justify-between pt-4 px-3 pb-3 border-b border-[#30363d] gap-2">
         <h1 className="m-0 text-lg leading-[1.2]">SimpleChat</h1>
         <button
-          className="m-0 py-1.5 px-2.5 text-xs leading-none bg-black text-white border-none cursor-pointer shrink-0 rounded-full whitespace-nowrap hover:bg-[#333]"
+          className="m-0 py-1.5 px-2.5 text-xs leading-none bg-[#f0f6fc] text-[#0d1117] border-none cursor-pointer shrink-0 rounded-full whitespace-nowrap hover:bg-[#c9d1d9]"
           onClick={actions.newProject}
           title="New project"
         >
@@ -203,7 +203,7 @@ export default function Sidebar({ projects, conversations, settings, actions }) 
         </button>
       </div>
 
-      <div className="px-2 py-2 border-b border-[#ddd]">
+      <div className="px-2 py-2 border-b border-[#30363d]">
         <SearchInput onSubmit={actions.search} onClear={actions.clearSearch} />
       </div>
 

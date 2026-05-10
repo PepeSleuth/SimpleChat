@@ -17,17 +17,17 @@ export default function ChatArea({
   onEdit,
   onCopy,
 }) {
-  const actionButtonClass = 'py-[2px] px-[6px] text-xs bg-[#999] text-white border-none rounded-[3px] cursor-pointer hover:bg-[#777]';
+  const actionButtonClass = 'py-[2px] px-[6px] text-xs bg-[#30363d] text-[#e6edf3] border-none rounded-[3px] cursor-pointer hover:bg-[#484f58]';
 
   return (
     <div className="flex-1 overflow-y-auto p-5" ref={chatRef}>
       {messages.length === 0 && !isStreaming && !isConversationLoading && (
-        <div className="text-[#aaa] text-center mt-[60px] text-[15px]">Start a conversation</div>
+        <div className="text-[#6e7681] text-center mt-[60px] text-[15px]">Start a conversation</div>
       )}
 
       {messages.map((msg, i) => (
         <div key={msg.id ?? i} className="group mb-5">
-          <div className={`text-xs font-bold uppercase tracking-[0.05em] mb-1 ${msg.role === 'user' ? 'text-black' : 'text-[#999]'}`}>
+          <div className={`text-xs font-bold uppercase tracking-[0.05em] mb-1 ${msg.role === 'user' ? 'text-[#f0f6fc]' : 'text-[#8b949e]'}`}>
             {msg.role === 'user' ? 'You' : 'AI'}
           </div>
           <div className="text-base leading-[1.6]">
@@ -85,7 +85,7 @@ export default function ChatArea({
 
       {(isStreaming || isConversationLoading) && (
         <div className="group mb-5">
-          <div className="text-xs font-bold uppercase tracking-[0.05em] mb-1 text-[#999]">AI</div>
+          <div className="text-xs font-bold uppercase tracking-[0.05em] mb-1 text-[#8b949e]">AI</div>
           <div className="text-base leading-[1.6]">
             {isConversationLoading ? 'Loading conversation...' : (
               <>
@@ -99,7 +99,7 @@ export default function ChatArea({
 
       {error && (
         <div className="mb-5">
-          <span className="text-[#c00] font-bold">Error: {error}</span>
+          <span className="text-[#ff7b72] font-bold">Error: {error}</span>
         </div>
       )}
     </div>

@@ -22,10 +22,10 @@ export default function MessageStats({ stats }) {
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-[6px] mt-[10px] pt-[6px] border-t border-[#eee] text-[11px] text-[#bbb] font-mono invisible group-hover:visible">
+    <div className="flex flex-wrap items-center gap-[6px] mt-[10px] pt-[6px] border-t border-[#30363d] text-[11px] text-[#6e7681] font-mono invisible group-hover:visible">
       {parts.map((part, i) => (
         <span key={i} className="whitespace-nowrap overflow-hidden text-ellipsis max-w-[240px]">
-          {i > 0 && <span className="text-[#ddd] select-none max-w-none">|</span>}
+          {i > 0 && <span className="text-[#484f58] select-none max-w-none">|</span>}
           {part}
         </span>
       ))}

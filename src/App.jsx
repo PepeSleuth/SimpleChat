@@ -652,7 +652,7 @@ export default function App() {
     return (
       <div className="max-w-[480px] mx-auto mt-[60px] px-5">
         <h1 className="m-0 mb-2">SimpleChat</h1>
-        <p className="m-0 text-[#666]">Loading chats...</p>
+        <p className="m-0 text-[#9da7b3]">Loading chats...</p>
       </div>
     );
   }
@@ -673,7 +673,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full bg-[#0d1117] text-[#e6edf3]">
       <Sidebar
         projects={{ items: projects, selected: selectedProject, isSearching: searchResults !== null }}
         conversations={{ items: conversations, filtered: filteredConversations, currentId: currentConversationId }}
