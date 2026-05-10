@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import modelsRaw from '../data/models.txt?raw';
 import {
   appendMessage,
@@ -36,6 +37,9 @@ const MODEL_LIST = modelsRaw.split('\n').map(l => l.trim()).filter(Boolean);
 const DEFAULT_MODEL = 'openai/gpt-5.4-nano';
 
 export default function App() {
+  const { conversationId: conversationIdParam } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState(DEFAULT_MODEL);
   const [configured, setConfigured] = useState(false);
@@ -66,6 +70,8 @@ export default function App() {
   const fileInputRef = useRef(null);
   const loadSeqRef = useRef(0);
   const previousMessagesRef = useRef([]);
+  const savedConversationIdRef = useRef(null);
+  const pendingRouteConversationRef = useRef(null);
   const {
     dialog,
     promptText,
@@ -82,6 +88,9 @@ export default function App() {
     ? searchResults
     : conversations.filter(c => c.projectId === selectedProject?.id)
   ).slice().sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  const routeConversationId = /^\d+$/.test(conversationIdParam ?? '')
+    ? Number(conversationIdParam)
+    : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -99,6 +108,7 @@ export default function App() {
         setConfigured(Boolean(state.settings.apiKey));
         setProjects(state.projects);
         setConversations(state.conversations);
+        savedConversationIdRef.current = state.currentConversationId;
         setCurrentConversationId(state.currentConversationId);
         setMessages(hydrateMessages(state.messages));
         setReasoningEffort(state.settings.reasoningEffort ?? null);
@@ -143,6 +153,47 @@ export default function App() {
       setSetting('currentConversationId', currentConversationId);
     }
   }, [currentConversationId]);
+
+  useEffect(() => {
+    if (isBootstrapping || !configured || conversations.length === 0) return;
+
+    const savedConversation = conversations.find(conv => conv.id === savedConversationIdRef.current);
+    const fallbackConversation = savedConversation ?? conversations[0];
+
+    if (location.pathname === '/') {
+      navigate(`/chats/${fallbackConversation.id}`, { replace: true });
+      return;
+    }
+
+    const pendingRouteConversation = pendingRouteConversationRef.current?.id === routeConversationId
+      ? pendingRouteConversationRef.current
+      : null;
+    const routeConversation = conversations.find(conv => conv.id === routeConversationId) ?? pendingRouteConversation;
+    if (!routeConversation) {
+      navigate(`/chats/${fallbackConversation.id}`, { replace: true });
+      return;
+    }
+
+    if (currentConversationId === routeConversation.id) {
+      if (selectedProjectId !== routeConversation.projectId) {
+        setSelectedProjectId(routeConversation.projectId);
+      }
+      return;
+    }
+
+    openConversation(routeConversation.id, routeConversation);
+  }, [
+    isBootstrapping,
+    configured,
+    conversations,
+    location.pathname,
+    routeConversationId,
+    currentConversationId,
+    selectedProjectId,
+    isStreaming,
+    isConversationLoading,
+    navigate,
+  ]);
 
   async function handleSearchSubmit(q) {
     const results = await searchConversations(q);
@@ -228,6 +279,10 @@ export default function App() {
       if (seq !== loadSeqRef.current) return;
       setMessages(hydrateMessages(rawMessages));
       setCurrentConversationId(conversationId);
+      savedConversationIdRef.current = conversationId;
+      if (pendingRouteConversationRef.current?.id === conversationId) {
+        pendingRouteConversationRef.current = null;
+      }
       const conv = knownConversation ?? conversations.find(c => c.id === conversationId);
       if (conv?.projectId) setSelectedProjectId(conv.projectId);
       await setSetting('currentConversationId', conversationId);
@@ -268,8 +323,9 @@ export default function App() {
       const project = getProjectById(projectId) ?? defaultProject;
       const projectConversationCount = conversations.filter(conv => conv.projectId === (project?.id ?? projectId)).length;
       const conversation = await createConversation(`Conversation ${projectConversationCount + 1}`, project?.id ?? projectId);
+      pendingRouteConversationRef.current = conversation;
       setConversations(prev => [...prev, conversation]);
-      await openConversation(conversation.id, conversation);
+      navigate(`/chats/${conversation.id}`);
     } catch (err) {
       setError(err.message || 'Failed to create conversation');
     }
@@ -359,7 +415,7 @@ export default function App() {
 
       if (currentConversationId === conv.id) {
         const sameProject = remaining.find(c => c.projectId === conv.projectId) ?? remaining[0];
-        await openConversation(sameProject.id);
+        navigate(`/chats/${sameProject.id}`, { replace: true });
       }
     } catch (err) {
       setError(err.message || 'Failed to delete conversation');
@@ -410,8 +466,9 @@ export default function App() {
         messages: branchMessages,
         projectId: currentConv.projectId,
       });
+      pendingRouteConversationRef.current = branch;
       setConversations(prev => [...prev, branch]);
-      await openConversation(branch.id, branch);
+      navigate(`/chats/${branch.id}`);
     } catch (err) {
       setError(err.message || 'Failed to branch conversation');
     }
@@ -705,6 +762,7 @@ export default function App() {
           renameProject,
           deleteProject,
           openConversation,
+          canOpenConversation: !isStreaming && !isConversationLoading,
           moveConversation,
           renameConversation,
           deleteConversation,

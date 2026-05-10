@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 const convActionBase = 'm-0 py-[2px] px-[5px] text-xs bg-transparent text-inherit border border-current cursor-pointer opacity-70 rounded-[3px] hover:opacity-100';
 const projectActionClass = 'm-0 py-1 px-[7px] text-xs bg-transparent text-[#c9d1d9] border border-[#30363d] cursor-pointer rounded-full hover:text-white hover:border-[#8b949e] hover:bg-[#21262d]';
@@ -92,17 +93,22 @@ function ConversationList({ projects, conversations, actions }) {
           return (
             <div
               key={conv.id}
-              className={`group flex items-center justify-between py-2 px-3 cursor-pointer select-none gap-[6px] ${isActive ? 'bg-[#f0f6fc] text-[#0d1117]' : 'hover:bg-[#161b22]'}`}
-              onClick={() => actions.openConversation(conv.id)}
+              className={`group flex items-center justify-between py-2 px-3 select-none gap-[6px] ${isActive ? 'bg-[#f0f6fc] text-[#0d1117]' : 'hover:bg-[#161b22]'}`}
             >
-              <span className="flex-1 overflow-hidden min-w-0">
+              <Link
+                to={`/chats/${conv.id}`}
+                className="flex-1 overflow-hidden min-w-0 text-inherit no-underline"
+                onClick={e => {
+                  if (actions.canOpenConversation === false) e.preventDefault();
+                }}
+              >
                 <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm">{conv.name}</span>
                 {projects.isSearching && (
                   <span className="block text-[10px] overflow-hidden text-ellipsis whitespace-nowrap leading-none mt-[1px] opacity-50">
                     {projects.items.find(p => p.id === conv.projectId)?.name ?? ''}
                   </span>
                 )}
-              </span>
+              </Link>
               <span className={`gap-[2px] shrink-0 ${isActive ? 'flex' : 'hidden group-hover:flex'}`}>
                 <button
                   className={`${convActionBase} hover:bg-white/15`}
