@@ -1,4 +1,5 @@
 import { attachmentToPart } from './attachments';
+import customInstructions from '../../data/custom_instructions.txt?raw';
 
 export function formatCost(cost) {
   if (cost == null) return null;
@@ -11,6 +12,11 @@ export function formatCost(cost) {
 
 export async function messagesToModelMessages(messages) {
   const modelMessages = [];
+  const instructions = customInstructions.trim();
+
+  if (instructions) {
+    modelMessages.push({ role: 'system', content: instructions });
+  }
 
   for (const message of messages) {
     if (message.role === 'assistant') {

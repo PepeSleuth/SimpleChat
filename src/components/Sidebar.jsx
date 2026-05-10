@@ -193,7 +193,18 @@ export default function Sidebar({ projects, conversations, settings, actions }) 
   return (
     <aside className="w-60 shrink-0 flex flex-col bg-[#010409] border-r border-[#30363d]">
       <div className="flex items-center justify-between pt-4 px-3 pb-3 border-b border-[#30363d] gap-2">
-        <h1 className="m-0 text-lg leading-[1.2]">SimpleChat</h1>
+        <div className="flex items-center gap-2 min-w-0">
+          <h1 className="m-0 text-lg leading-[1.2] truncate">SimpleChat</h1>
+          <button
+            type="button"
+            className="m-0 w-7 h-7 p-0 text-base leading-none bg-transparent text-[#9da7b3] border border-[#30363d] cursor-pointer shrink-0 rounded-full hover:text-[#f0f6fc] hover:border-[#8b949e] hover:bg-[#161b22]"
+            onClick={actions.updateApiKey}
+            title="Update OpenRouter key"
+            aria-label="Update OpenRouter key"
+          >
+            ⚙
+          </button>
+        </div>
         <button
           className="m-0 py-1.5 px-2.5 text-xs leading-none bg-[#f0f6fc] text-[#0d1117] border-none cursor-pointer shrink-0 rounded-full whitespace-nowrap hover:bg-[#c9d1d9]"
           onClick={actions.newProject}

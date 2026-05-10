@@ -32,8 +32,9 @@ export default function AppDialog({ dialog, onCancel, onSubmit }) {
             ) : (
               <input
                 name="value"
-                type="text"
+                type={dialog.inputType ?? 'text'}
                 defaultValue={dialog.initialValue ?? ''}
+                placeholder={dialog.placeholder ?? ''}
                 className="w-full py-2 px-[10px] text-sm bg-[#010409] text-[#e6edf3] border border-[#30363d] outline-none focus:border-[#8b949e]"
                 autoFocus
               />

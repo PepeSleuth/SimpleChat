@@ -168,6 +168,22 @@ export default function App() {
     setSetting('webSearchEnabled', webSearchEnabled);
   }
 
+  async function updateApiKey() {
+    const nextApiKey = await promptText({
+      title: 'OpenRouter key',
+      message: 'Enter a new OpenRouter API key.',
+      submitLabel: 'Save',
+      inputType: 'password',
+      placeholder: 'sk-or-...',
+    });
+    const trimmed = nextApiKey?.trim();
+    if (nextApiKey == null || !trimmed) return;
+
+    setError('');
+    setApiKey(trimmed);
+    setSetting('apiKey', trimmed);
+  }
+
   function changeModel() {
     setModelPickerInput('');
     setShowModelPicker(true);
@@ -688,6 +704,7 @@ export default function App() {
           moveConversation,
           renameConversation,
           deleteConversation,
+          updateApiKey,
           changeModel,
           toggleWebSearch,
           setReasoningEffort: handleSetReasoningEffort,
