@@ -47,7 +47,7 @@ export default function ChatArea({
             )}
             {msg.role === 'assistant' ? (
               <>
-                <MessageStats stats={msg.stats} />
+                <MessageStats stats={msg.stats} createdAt={msg.createdAt} />
                 <div className="mt-1 flex items-center gap-[6px] invisible group-hover:visible">
                   <button
                     className={actionButtonClass}
