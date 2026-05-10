@@ -3,24 +3,35 @@ import { useState } from 'react';
 const convActionBase = 'm-0 py-[2px] px-[5px] text-xs bg-transparent text-inherit border border-current cursor-pointer opacity-70 rounded-[3px] hover:opacity-100';
 const projectActionClass = 'm-0 py-1 px-[7px] text-xs bg-transparent text-[#c9d1d9] border border-[#30363d] cursor-pointer rounded-full hover:text-white hover:border-[#8b949e] hover:bg-[#21262d]';
 
-function SearchInput({ onSubmit, onClear }) {
+function SearchInput({ onSubmit, onClear, onNewConversation, selectedProject }) {
   const [value, setValue] = useState('');
   return (
-    <div className="relative">
-      <input
-        type="text"
-        placeholder="Search conversations..."
-        value={value}
-        onChange={e => setValue(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') onSubmit(value); }}
-        className="w-full py-1.5 pl-3 pr-7 text-[13px] bg-[#0d1117] text-[#e6edf3] border border-[#30363d] rounded-full outline-none focus:border-[#8b949e] placeholder-[#6e7681]"
-      />
-      {value && (
-        <button
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8b949e] hover:text-[#f0f6fc] text-sm leading-none"
-          onClick={() => { setValue(''); onClear(); }}
-        >x</button>
-      )}
+    <div className="flex items-center gap-2">
+      <div className="relative flex-1 min-w-0">
+        <input
+          type="text"
+          placeholder="Search conversations..."
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') onSubmit(value); }}
+          className="w-full py-1.5 pl-3 pr-7 text-[13px] bg-[#0d1117] text-[#e6edf3] border border-[#30363d] rounded-full outline-none focus:border-[#8b949e] placeholder-[#6e7681]"
+        />
+        {value && (
+          <button
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8b949e] hover:text-[#f0f6fc] text-sm leading-none"
+            onClick={() => { setValue(''); onClear(); }}
+          >x</button>
+        )}
+      </div>
+      <button
+        type="button"
+        className="m-0 h-[31px] w-[31px] p-0 text-lg leading-none bg-[#f0f6fc] text-[#0d1117] border-none cursor-pointer shrink-0 rounded-full hover:bg-[#c9d1d9]"
+        onClick={() => onNewConversation(selectedProject?.id)}
+        title={selectedProject ? `New chat in ${selectedProject.name}` : 'New chat'}
+        aria-label={selectedProject ? `New chat in ${selectedProject.name}` : 'New chat'}
+      >
+        +
+      </button>
     </div>
   );
 }
@@ -42,13 +53,6 @@ function ProjectList({ projects, actions }) {
               {project.name}
             </span>
             <div className="flex gap-1 shrink-0">
-              <button
-                className={projectActionClass}
-                title="New conversation"
-                onClick={e => { e.stopPropagation(); actions.newConversation(project.id); }}
-              >
-                +
-              </button>
               {!project.isDefault && (
                 <>
                   <button
@@ -215,7 +219,12 @@ export default function Sidebar({ projects, conversations, settings, actions }) 
       </div>
 
       <div className="px-2 py-2 border-b border-[#30363d]">
-        <SearchInput onSubmit={actions.search} onClear={actions.clearSearch} />
+        <SearchInput
+          onSubmit={actions.search}
+          onClear={actions.clearSearch}
+          onNewConversation={actions.newConversation}
+          selectedProject={projects.selected}
+        />
       </div>
 
       <ProjectList projects={projects} actions={actions} />
