@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { streamText } from 'ai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import modelsRaw from '../data/models.txt?raw';
 import {
   appendMessage,
@@ -23,12 +21,14 @@ import {
 } from './chatDb';
 import { downloadJson } from './lib/exportUtils';
 import { hydrateMessages, releaseAttachmentUrls, makeDraftAttachment } from './lib/attachments';
-import { messagesToModelMessages, createOpenRouterTools } from './lib/messageUtils';
+import { streamOpenRouterChat } from './lib/openRouterChat';
+import { useAppDialog } from './hooks/useAppDialog';
 import SetupScreen from './components/SetupScreen';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import ChatInput from './components/ChatInput';
 import ModelPicker from './components/ModelPicker';
+import AppDialog from './components/AppDialog';
 
 const MODEL_LIST = modelsRaw.split('\n').map(l => l.trim()).filter(Boolean);
 const DEFAULT_MODEL = 'openai/gpt-5.4-nano';
@@ -63,6 +63,14 @@ export default function App() {
   const fileInputRef = useRef(null);
   const loadSeqRef = useRef(0);
   const previousMessagesRef = useRef([]);
+  const {
+    dialog,
+    promptText,
+    confirmAction,
+    pickProject,
+    cancelDialog,
+    submitDialog,
+  } = useAppDialog();
 
   const currentConv = conversations.find(c => c.id === currentConversationId);
   const defaultProject = projects.find(project => project.isDefault) ?? projects[0] ?? null;
@@ -149,9 +157,10 @@ export default function App() {
   function saveConfig() {
     const nextApiKey = apiKeyInput.trim();
     const nextModel = modelInput.trim();
-    if (!nextApiKey) { alert('Enter an API key'); return; }
-    if (!nextModel) { alert('Enter a model name'); return; }
+    if (!nextApiKey) { setError('Enter an API key'); return; }
+    if (!nextModel) { setError('Enter a model name'); return; }
 
+    setError('');
     setApiKey(nextApiKey);
     setModel(nextModel);
     setConfigured(true);
@@ -189,32 +198,11 @@ export default function App() {
     return getProjectById(conv.projectId) ?? defaultProject;
   }
 
-  function chooseProjectId(message, initialValue = '') {
-    if (!projects.length) return null;
-
-    const lines = projects.map((project, index) => {
-      const suffix = project.isDefault ? ' (default)' : '';
-      return `${index + 1}. ${project.name}${suffix}`;
-    }).join('\n');
-
-    const answer = prompt(`${message}\n\n${lines}`, initialValue);
-    if (!answer) return null;
-
-    const trimmed = answer.trim();
-    const numericChoice = Number(trimmed);
-    if (Number.isInteger(numericChoice) && numericChoice >= 1 && numericChoice <= projects.length) {
-      return projects[numericChoice - 1].id;
-    }
-
-    const exactMatch = projects.find(project => project.name.toLowerCase() === trimmed.toLowerCase());
-    return exactMatch?.id ?? null;
-  }
-
   function updateConversations(nextConversation) {
     setConversations(prev => prev.map(conv => (conv.id === nextConversation.id ? nextConversation : conv)));
   }
 
-  async function openConversation(conversationId) {
+  async function openConversation(conversationId, knownConversation = null) {
     if (conversationId == null || isStreaming || isConversationLoading) return;
     const seq = ++loadSeqRef.current;
     setIsConversationLoading(true);
@@ -225,7 +213,7 @@ export default function App() {
       if (seq !== loadSeqRef.current) return;
       setMessages(hydrateMessages(rawMessages));
       setCurrentConversationId(conversationId);
-      const conv = conversations.find(c => c.id === conversationId);
+      const conv = knownConversation ?? conversations.find(c => c.id === conversationId);
       if (conv?.projectId) setSelectedProjectId(conv.projectId);
       await setSetting('currentConversationId', conversationId);
     } catch (err) {
@@ -238,8 +226,12 @@ export default function App() {
   async function newProject() {
     if (isStreaming || isConversationLoading) return;
 
-    const name = prompt('Enter project name:', `Project ${projects.filter(project => !project.isDefault).length + 1}`);
-    if (!name || !name.trim()) return;
+    const name = await promptText({
+      title: 'New project',
+      initialValue: `Project ${projects.filter(project => !project.isDefault).length + 1}`,
+      submitLabel: 'Create',
+    });
+    if (!name?.trim()) return;
 
     try {
       const project = await createProject(name.trim());
@@ -262,15 +254,19 @@ export default function App() {
       const projectConversationCount = conversations.filter(conv => conv.projectId === (project?.id ?? projectId)).length;
       const conversation = await createConversation(`Conversation ${projectConversationCount + 1}`, project?.id ?? projectId);
       setConversations(prev => [...prev, conversation]);
-      await openConversation(conversation.id);
+      await openConversation(conversation.id, conversation);
     } catch (err) {
       setError(err.message || 'Failed to create conversation');
     }
   }
 
   async function renameConversation(conv) {
-    const newName = prompt('Enter new conversation name:', conv.name);
-    if (!newName || !newName.trim() || newName.trim() === conv.name) return;
+    const newName = await promptText({
+      title: 'Rename conversation',
+      initialValue: conv.name,
+      submitLabel: 'Rename',
+    });
+    if (!newName?.trim() || newName.trim() === conv.name) return;
 
     try {
       const updated = await renameConversationRecord(conv.id, newName.trim());
@@ -285,8 +281,12 @@ export default function App() {
   async function renameProject(project) {
     if (project.isDefault) return;
 
-    const newName = prompt('Enter new project name:', project.name);
-    if (!newName || !newName.trim() || newName.trim() === project.name) return;
+    const newName = await promptText({
+      title: 'Rename project',
+      initialValue: project.name,
+      submitLabel: 'Rename',
+    });
+    if (!newName?.trim() || newName.trim() === project.name) return;
 
     try {
       const updated = await renameProjectRecord(project.id, newName.trim());
@@ -300,11 +300,16 @@ export default function App() {
 
   async function moveConversation(conv) {
     if (projects.length <= 1) {
-      alert('Create another project first');
+      setError('Create another project first');
       return;
     }
 
-    const targetProjectId = chooseProjectId(`Move "${conv.name}" to which project?`, getConversationProject(conv)?.name ?? '');
+    const targetProjectId = await pickProject({
+      title: 'Move conversation',
+      message: `Move "${conv.name}" to which project?`,
+      projects,
+      currentProjectId: getConversationProject(conv)?.id ?? null,
+    });
     if (targetProjectId == null || targetProjectId === conv.projectId) return;
 
     try {
@@ -319,13 +324,18 @@ export default function App() {
 
   async function deleteConversation(conv) {
     if (conversations.length <= 1) {
-      alert('Cannot delete the last conversation');
+      setError('Cannot delete the last conversation');
       return;
     }
 
     if (isStreaming) return;
 
-    if (!confirm(`Delete "${conv.name}"?`)) return;
+    const shouldDelete = await confirmAction({
+      title: 'Delete conversation',
+      message: `Delete "${conv.name}"?`,
+      submitLabel: 'Delete',
+    });
+    if (!shouldDelete) return;
 
     try {
       await deleteConversationRecord(conv.id);
@@ -346,7 +356,12 @@ export default function App() {
 
     const projectConversationCount = conversations.filter(conv => conv.projectId === project.id).length;
     const suffix = projectConversationCount ? ` and move ${projectConversationCount} conversation${projectConversationCount === 1 ? '' : 's'} to Unsorted` : '';
-    if (!confirm(`Delete project "${project.name}"${suffix}?`)) return;
+    const shouldDelete = await confirmAction({
+      title: 'Delete project',
+      message: `Delete project "${project.name}"${suffix}?`,
+      submitLabel: 'Delete',
+    });
+    if (!shouldDelete) return;
 
     try {
       const result = await deleteProjectRecord(project.id);
@@ -367,8 +382,12 @@ export default function App() {
     if (!currentConv || isStreaming || isConversationLoading) return;
 
     const branchMessages = messages.slice(0, messageIndex + 1);
-    const branchName = prompt('Enter name for branched conversation:', `${currentConv.name} (Branch)`);
-    if (!branchName || !branchName.trim()) return;
+    const branchName = await promptText({
+      title: 'Branch conversation',
+      initialValue: `${currentConv.name} (Branch)`,
+      submitLabel: 'Branch',
+    });
+    if (!branchName?.trim()) return;
 
     try {
       const branch = await duplicateConversationFromMessages({
@@ -377,7 +396,7 @@ export default function App() {
         projectId: currentConv.projectId,
       });
       setConversations(prev => [...prev, branch]);
-      await openConversation(branch.id);
+      await openConversation(branch.id, branch);
     } catch (err) {
       setError(err.message || 'Failed to branch conversation');
     }
@@ -505,52 +524,27 @@ export default function App() {
         }
       }
 
-      const openrouter = createOpenRouter({ apiKey });
-      const modelOptions = {
-        usage: { include: true },
-        ...(reasoningEffort ? { extraBody: { reasoning: { effort: reasoningEffort } } } : {}),
-      };
-      const tools = webSearchEnabled ? createOpenRouterTools(openrouter) : undefined;
-
-      const modelMessages = await messagesToModelMessages([...draftMessages, userMessage]);
-      const result = streamText({
-        model: openrouter(model, modelOptions),
-        messages: modelMessages,
-        ...(tools ? { tools } : {}),
-        abortSignal: controller.signal,
-      });
-
       consumePendingAttachments();
-
-      let fullText = '';
-      for await (const chunk of result.textStream) {
-        fullText += chunk;
-        setStreamingText(fullText);
-      }
-
-      const usage = await result.usage;
-      const providerMeta = (await result.providerMetadata) ?? (await result.experimental_providerMetadata);
-      const cost = providerMeta?.openrouter?.usage?.cost ?? null;
-      const webSearchRequests = providerMeta?.openrouter?.usage?.server_tool_use?.web_search_requests ?? null;
+      const assistantResponse = await streamOpenRouterChat({
+        apiKey,
+        model,
+        messages: [...draftMessages, userMessage],
+        reasoningEffort,
+        webSearchEnabled,
+        abortSignal: controller.signal,
+        onText: setStreamingText,
+      });
       const assistantRecord = await appendMessage({
         conversationId: currentConversationId,
         role: 'assistant',
-        text: fullText,
-        stats: {
-          date: new Date().toISOString(),
-          model,
-          promptTokens: usage?.promptTokens,
-          completionTokens: usage?.completionTokens,
-          totalTokens: usage?.totalTokens,
-          webSearchRequests,
-          cost,
-        },
+        text: assistantResponse.text,
+        stats: assistantResponse.stats,
       });
 
       setMessages(prev => [...prev, {
         id: assistantRecord.id,
         role: 'assistant',
-        text: fullText,
+        text: assistantResponse.text,
         stats: assistantRecord.stats,
         createdAt: assistantRecord.createdAt,
         attachments: [],
@@ -598,33 +592,27 @@ export default function App() {
   return (
     <div className="flex h-full">
       <Sidebar
-        projects={projects}
-        conversations={conversations}
-        filteredConversations={filteredConversations}
-        selectedProject={selectedProject}
-        currentConversationId={currentConversationId}
-        model={model}
-        webSearchEnabled={webSearchEnabled}
-        reasoningEffort={reasoningEffort}
-        isStreaming={isStreaming}
-        isConversationLoading={isConversationLoading}
-        onNewProject={newProject}
-        onSelectProject={setSelectedProjectId}
-        onNewConversation={newConversation}
-        onRenameProject={renameProject}
-        onDeleteProject={deleteProject}
-        onOpenConversation={openConversation}
-        onMoveConversation={moveConversation}
-        onRenameConversation={renameConversation}
-        onDeleteConversation={deleteConversation}
-        onChangeModel={changeModel}
-        onToggleWebSearch={toggleWebSearch}
-        onSetReasoningEffort={handleSetReasoningEffort}
-        onExport={handleExport}
-        onImport={handleImport}
-        onSearchSubmit={handleSearchSubmit}
-        onSearchClear={handleSearchClear}
-        isSearching={searchResults !== null}
+        projects={{ items: projects, selected: selectedProject, isSearching: searchResults !== null }}
+        conversations={{ items: conversations, filtered: filteredConversations, currentId: currentConversationId }}
+        settings={{ model, webSearchEnabled, reasoningEffort }}
+        actions={{
+          newProject,
+          selectProject: setSelectedProjectId,
+          newConversation,
+          renameProject,
+          deleteProject,
+          openConversation,
+          moveConversation,
+          renameConversation,
+          deleteConversation,
+          changeModel,
+          toggleWebSearch,
+          setReasoningEffort: handleSetReasoningEffort,
+          exportData: handleExport,
+          importData: handleImport,
+          search: handleSearchSubmit,
+          clearSearch: handleSearchClear,
+        }}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -661,6 +649,8 @@ export default function App() {
           onClose={() => setShowModelPicker(false)}
         />
       )}
+
+      <AppDialog dialog={dialog} onCancel={cancelDialog} onSubmit={submitDialog} />
     </div>
   );
 }

@@ -6,13 +6,13 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@openrouter/ai-sdk-provider": "latest",
+    "@openrouter/ai-sdk-provider": "^2.9.0",
     "@tailwindcss/vite": "^4.2.4",
-    "ai": "latest",
+    "ai": "^6.0.174",
     "dexie": "^4.4.2",
     "katex": "^0.16.45",
-    "react": "latest",
-    "react-dom": "latest",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
     "react-markdown": "^10.1.0",
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
@@ -20,7 +20,7 @@
     "tailwindcss": "^4.2.4"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "latest",
-    "vite": "latest"
+    "@vitejs/plugin-react": "^6.0.1",
+    "vite": "^8.0.10"
   }
 }
