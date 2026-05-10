@@ -35,6 +35,25 @@ import AppDialog from './components/AppDialog';
 
 const MODEL_LIST = modelsRaw.split('\n').map(l => l.trim()).filter(Boolean);
 const DEFAULT_MODEL = 'openai/gpt-5.4-nano';
+const YEAR_AGO_FILTER_ID = 'year-ago-filter';
+
+function formatLocalDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getDefaultYearAgoDate() {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() - 1);
+  return formatLocalDate(date);
+}
+
+function isConversationOnDate(conv, dateValue) {
+  if (!dateValue || !conv.createdAt) return false;
+  return formatLocalDate(new Date(conv.createdAt)) === dateValue;
+}
 
 export default function App() {
   const { conversationId: conversationIdParam } = useParams();
@@ -64,6 +83,7 @@ export default function App() {
   const [reasoningEffort, setReasoningEffort] = useState(null);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [yearAgoFilterDate, setYearAgoFilterDate] = useState(getDefaultYearAgoDate);
   const [searchResults, setSearchResults] = useState(null);
   const chatRef = useRef(null);
   const abortRef = useRef(null);
@@ -83,10 +103,22 @@ export default function App() {
 
   const currentConv = conversations.find(c => c.id === currentConversationId);
   const defaultProject = projects.find(project => project.isDefault) ?? projects[0] ?? null;
-  const selectedProject = projects.find(p => p.id === selectedProjectId) ?? projects[0] ?? null;
+  const yearAgoFilterProject = {
+    id: YEAR_AGO_FILTER_ID,
+    name: 'One year ago',
+    isDateFilter: true,
+    filterDate: yearAgoFilterDate,
+  };
+  const projectItems = [...projects, yearAgoFilterProject];
+  const selectedProject = selectedProjectId === YEAR_AGO_FILTER_ID
+    ? yearAgoFilterProject
+    : projects.find(p => p.id === selectedProjectId) ?? projects[0] ?? null;
+  const selectedProjectIsDateFilter = selectedProject?.id === YEAR_AGO_FILTER_ID;
   const filteredConversations = (searchResults !== null
     ? searchResults
-    : conversations.filter(c => c.projectId === selectedProject?.id)
+    : selectedProjectIsDateFilter
+      ? conversations.filter(c => isConversationOnDate(c, yearAgoFilterDate))
+      : conversations.filter(c => c.projectId === selectedProject?.id)
   ).slice().sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
   const routeConversationId = /^\d+$/.test(conversationIdParam ?? '')
     ? Number(conversationIdParam)
@@ -175,7 +207,7 @@ export default function App() {
     }
 
     if (currentConversationId === routeConversation.id) {
-      if (selectedProjectId !== routeConversation.projectId) {
+      if (selectedProjectId !== YEAR_AGO_FILTER_ID && selectedProjectId !== routeConversation.projectId) {
         setSelectedProjectId(routeConversation.projectId);
       }
       return;
@@ -202,6 +234,15 @@ export default function App() {
 
   function handleSearchClear() {
     setSearchResults(null);
+  }
+
+  function randomizeYearAgoFilterDate() {
+    const datedConversations = conversations.filter(conv => conv.createdAt);
+    if (!datedConversations.length) return;
+
+    const randomConversation = datedConversations[Math.floor(Math.random() * datedConversations.length)];
+    setYearAgoFilterDate(formatLocalDate(new Date(randomConversation.createdAt)));
+    setSelectedProjectId(YEAR_AGO_FILTER_ID);
   }
 
   function saveConfig() {
@@ -752,12 +793,20 @@ export default function App() {
   return (
     <div className="flex h-full bg-[#0d1117] text-[#e6edf3]">
       <Sidebar
-        projects={{ items: projects, selected: selectedProject, isSearching: searchResults !== null }}
+        projects={{
+          items: projectItems,
+          selected: selectedProject,
+          isSearching: searchResults !== null,
+          dateFilterId: YEAR_AGO_FILTER_ID,
+          dateFilterValue: yearAgoFilterDate,
+        }}
         conversations={{ items: conversations, filtered: filteredConversations, currentId: currentConversationId }}
         settings={{ model, webSearchEnabled, reasoningEffort }}
         actions={{
           newProject,
           selectProject: setSelectedProjectId,
+          setDateFilter: setYearAgoFilterDate,
+          randomizeDateFilter: randomizeYearAgoFilterDate,
           newConversation,
           renameProject,
           deleteProject,

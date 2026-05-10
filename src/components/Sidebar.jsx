@@ -44,6 +44,46 @@ function ProjectList({ projects, actions }) {
     <div className="border-b border-[#30363d]">
       {projects.items.map(project => {
         const isSelected = project.id === projects.selected?.id;
+        if (project.isDateFilter) {
+          return (
+            <details
+              key={project.id}
+              className={`group px-3 py-[7px] cursor-pointer select-none ${isSelected ? 'bg-[#21262d]' : 'hover:bg-[#161b22]'}`}
+              open={isSelected}
+              onClick={() => actions.selectProject(project.id)}
+            >
+              <summary className="flex items-center justify-between gap-2 list-none">
+                <span className={`text-[13px] overflow-hidden text-ellipsis whitespace-nowrap flex-1 ${isSelected ? 'font-bold text-[#f0f6fc]' : 'text-[#9da7b3]'}`}>
+                  {project.name}
+                </span>
+                <span className="text-[11px] text-[#8b949e] shrink-0">{project.filterDate}</span>
+              </summary>
+              <label
+                className="mt-2 flex flex-col gap-1 text-[11px] uppercase tracking-[0.05em] text-[#8b949e]"
+                onClick={e => e.stopPropagation()}
+              >
+                Created on
+                <span className="flex gap-1">
+                  <input
+                    type="date"
+                    value={projects.dateFilterValue}
+                    onChange={e => actions.setDateFilter(e.target.value)}
+                    className="min-w-0 flex-1 py-1.5 px-2 text-[13px] normal-case tracking-normal bg-[#0d1117] text-[#e6edf3] border border-[#30363d] outline-none focus:border-[#8b949e]"
+                  />
+                  <button
+                    type="button"
+                    className={`${projectActionClass} shrink-0 rounded-[3px]`}
+                    title="Use a random chat date"
+                    onClick={actions.randomizeDateFilter}
+                  >
+                    Random
+                  </button>
+                </span>
+              </label>
+            </details>
+          );
+        }
+
         return (
           <div
             key={project.id}
