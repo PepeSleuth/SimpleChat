@@ -29,19 +29,21 @@ export default function ChatArea({
       )}
 
       {messages.map((msg, i) => (
-        <div key={msg.id ?? i} className="group mb-5">
-          <div className={`text-xs font-bold uppercase tracking-[0.05em] mb-1 ${msg.role === 'user' ? 'text-[#f0f6fc]' : 'text-[#8b949e]'}`}>
+        <div key={msg.id ?? i} className={`group mb-5 chat-message chat-message-${msg.role}`}>
+          <div className={`message-meta text-xs font-bold uppercase tracking-[0.05em] mb-1 ${msg.role === 'user' ? 'text-[#f0f6fc]' : 'text-[#8b949e]'}`}>
             {msg.role === 'user' ? 'You' : 'AI'}
           </div>
-          <div className="text-base leading-[1.6]">
+          <div className="message-content text-base leading-[1.6]">
             {msg.role === 'assistant' ? (
               <>
                 <ReasoningAccordion stats={msg.stats} />
-                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.text}</ReactMarkdown>
+                <div className="markdown-body">
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.text}</ReactMarkdown>
+                </div>
               </>
             ) : (
               <>
-                {msg.text && <div className="whitespace-pre-wrap">{msg.text}</div>}
+                {msg.text && <div className="user-message-bubble whitespace-pre-wrap">{msg.text}</div>}
                 <MessageAttachments attachments={msg.attachments} />
               </>
             )}
@@ -90,13 +92,15 @@ export default function ChatArea({
       ))}
 
       {(isStreaming || isConversationLoading) && (
-        <div className="group mb-5">
-          <div className="text-xs font-bold uppercase tracking-[0.05em] mb-1 text-[#8b949e]">AI</div>
-          <div className="text-base leading-[1.6]">
+        <div className="group mb-5 chat-message chat-message-assistant">
+          <div className="message-meta text-xs font-bold uppercase tracking-[0.05em] mb-1 text-[#8b949e]">AI</div>
+          <div className="message-content text-base leading-[1.6]">
             {isConversationLoading ? 'Loading conversation...' : (
               <>
                 <ReasoningAccordion reasoningText={streamingReasoningText} reasoningEffort={reasoningEffort} />
-                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{streamingText}</ReactMarkdown>
+                <div className="markdown-body">
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{streamingText}</ReactMarkdown>
+                </div>
                 <span className="streaming"></span>
               </>
             )}

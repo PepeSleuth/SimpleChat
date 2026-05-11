@@ -15,6 +15,164 @@ body {
   color: #e6edf3;
   background: #0d1117;
   color-scheme: dark;
+  --message-rail-width: 48rem;
+}
+
+.chat-message {
+  width: 100%;
+}
+
+.message-meta,
+.message-content,
+.chat-input-rail {
+  width: min(var(--message-rail-width), 100%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.chat-message-assistant .message-meta,
+.chat-message-assistant .message-content {
+  text-align: left;
+}
+
+.chat-message-user .message-meta,
+.chat-message-user .message-content {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.chat-message-user .message-content {
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.chat-message-user .invisible {
+  align-self: flex-end;
+}
+
+.user-message-bubble {
+  max-width: 82%;
+  padding: 0.62rem 0.82rem;
+  border-radius: 8px;
+  background: #1f242b;
+  color: #f0f3f8;
+  line-height: 1.6;
+}
+
+.markdown-body {
+  width: 100%;
+  color: #e6edf3;
+  font-size: 15.5px;
+  line-height: 1.75;
+}
+
+.markdown-body > :first-child {
+  margin-top: 0;
+}
+
+.markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body p {
+  margin: 0 0 1.05em;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  margin: 1.25em 0 0.65em;
+  color: #f0f3f8;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.markdown-body h1 {
+  font-size: 1.45em;
+}
+
+.markdown-body h2 {
+  font-size: 1.25em;
+}
+
+.markdown-body h3 {
+  font-size: 1.12em;
+}
+
+.markdown-body h4 {
+  font-size: 1em;
+}
+
+.markdown-body strong {
+  color: #f0f3f8;
+  font-weight: 700;
+}
+
+.markdown-body em {
+  color: #f0f3f8;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin: 1.05em 0 1.35em;
+  padding-left: 2.05em;
+}
+
+.markdown-body ul {
+  list-style: disc;
+}
+
+.markdown-body ol {
+  list-style: decimal;
+}
+
+.markdown-body li {
+  margin: 0.45em 0;
+  padding-left: 0.15em;
+}
+
+.markdown-body li::marker {
+  color: #009dff;
+  font-size: 0.78em;
+}
+
+.markdown-body li > p {
+  margin: 0.45em 0;
+}
+
+.markdown-body blockquote {
+  margin: 1.1em 0;
+  padding-left: 1em;
+  color: #c7d0da;
+  border-left: 3px solid #30363d;
+}
+
+.markdown-body code {
+  padding: 0.12em 0.32em;
+  border-radius: 4px;
+  background: #161b22;
+  color: #f0f3f8;
+  font-size: 0.92em;
+}
+
+.markdown-body pre {
+  margin: 1.1em 0;
+  padding: 1em;
+  overflow-x: auto;
+  border-radius: 6px;
+  background: #161b22;
+}
+
+.markdown-body pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.markdown-body a {
+  color: #8ab4f8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* Streaming cursor — pseudo-element can't be done with Tailwind */

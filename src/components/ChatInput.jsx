@@ -64,33 +64,35 @@ export default function ChatInput({
         </div>
       )}
 
-      <div className="flex border-t border-[#30363d] py-3 px-5 gap-[10px] bg-[#0d1117] items-end flex-wrap">
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={e => onAddFiles(e.target.files)}
-          disabled={isInputDisabled}
-        />
-        <textarea
-          ref={textareaRef}
-          rows={1}
-          placeholder="Type your message here"
-          className="flex-1 min-w-[180px] py-[10px] px-3 text-base bg-[#010409] text-[#e6edf3] border border-[#30363d] outline-none focus:border-[#8b949e] resize-none overflow-y-auto leading-normal placeholder-[#6e7681]"
-          style={{ maxHeight: '200px' }}
-          value={inputText}
-          onChange={e => setInputText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          disabled={isInputDisabled}
-        />
-        <button
-          className="m-0 py-[10px] px-5 text-base bg-[#f0f6fc] text-[#0d1117] border-none cursor-pointer shrink-0 hover:bg-[#c9d1d9] disabled:bg-[#484f58] disabled:text-[#8b949e] disabled:cursor-not-allowed"
-          onClick={isStreaming ? onStop : submit}
-        >
-          {isStreaming ? 'Stop' : 'Send'}
-        </button>
+      <div className="border-t border-[#30363d] py-3 px-5 bg-[#0d1117]">
+        <div className="chat-input-rail flex gap-[10px] items-end flex-wrap">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={e => onAddFiles(e.target.files)}
+            disabled={isInputDisabled}
+          />
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            placeholder="Type your message here"
+            className="flex-1 min-w-[180px] py-[10px] px-3 text-base bg-[#010409] text-[#e6edf3] border border-[#30363d] outline-none focus:border-[#8b949e] resize-none overflow-y-auto leading-normal placeholder-[#6e7681]"
+            style={{ maxHeight: '200px' }}
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            disabled={isInputDisabled}
+          />
+          <button
+            className="m-0 py-[10px] px-5 text-base bg-[#f0f6fc] text-[#0d1117] border-none cursor-pointer shrink-0 hover:bg-[#c9d1d9] disabled:bg-[#484f58] disabled:text-[#8b949e] disabled:cursor-not-allowed"
+            onClick={isStreaming ? onStop : submit}
+          >
+            {isStreaming ? 'Stop' : 'Send'}
+          </button>
+        </div>
       </div>
     </>
   );
