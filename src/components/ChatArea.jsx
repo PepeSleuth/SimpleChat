@@ -7,6 +7,12 @@ import MessageStats from './MessageStats';
 import MessageAttachments from './MessageAttachments';
 import ReasoningAccordion from './ReasoningAccordion';
 
+const markdownRemarkPlugins = [
+  remarkGfm,
+  [remarkMath, { singleDollarTextMath: false }],
+];
+const markdownRehypePlugins = [rehypeKatex];
+
 export default function ChatArea({
   messages,
   isStreaming,
@@ -38,7 +44,7 @@ export default function ChatArea({
               <>
                 <ReasoningAccordion stats={msg.stats} />
                 <div className="markdown-body">
-                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.text}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={markdownRemarkPlugins} rehypePlugins={markdownRehypePlugins}>{msg.text}</ReactMarkdown>
                 </div>
               </>
             ) : (
@@ -99,7 +105,7 @@ export default function ChatArea({
               <>
                 <ReasoningAccordion reasoningText={streamingReasoningText} reasoningEffort={reasoningEffort} />
                 <div className="markdown-body">
-                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{streamingText}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={markdownRemarkPlugins} rehypePlugins={markdownRehypePlugins}>{streamingText}</ReactMarkdown>
                 </div>
                 <span className="streaming"></span>
               </>
