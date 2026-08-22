@@ -89,6 +89,7 @@ export default function App() {
   const abortRef = useRef(null);
   const fileInputRef = useRef(null);
   const loadSeqRef = useRef(0);
+  const lastSyncedRouteConvIdRef = useRef(null);
   const previousMessagesRef = useRef([]);
   const savedConversationIdRef = useRef(null);
   const pendingRouteConversationRef = useRef(null);
@@ -207,12 +208,16 @@ export default function App() {
     }
 
     if (currentConversationId === routeConversation.id) {
-      if (selectedProjectId !== YEAR_AGO_FILTER_ID && selectedProjectId !== routeConversation.projectId) {
-        setSelectedProjectId(routeConversation.projectId);
+      if (lastSyncedRouteConvIdRef.current !== routeConversation.id) {
+        lastSyncedRouteConvIdRef.current = routeConversation.id;
+        if (selectedProjectId !== YEAR_AGO_FILTER_ID && selectedProjectId !== routeConversation.projectId) {
+          setSelectedProjectId(routeConversation.projectId);
+        }
       }
       return;
     }
 
+    lastSyncedRouteConvIdRef.current = routeConversation.id;
     openConversation(routeConversation.id, routeConversation);
   }, [
     isBootstrapping,
@@ -325,7 +330,9 @@ export default function App() {
         pendingRouteConversationRef.current = null;
       }
       const conv = knownConversation ?? conversations.find(c => c.id === conversationId);
-      if (conv?.projectId) setSelectedProjectId(conv.projectId);
+      if (conv?.projectId) {
+        setSelectedProjectId(prev => (prev === YEAR_AGO_FILTER_ID ? prev : conv.projectId));
+      }
       await setSetting('currentConversationId', conversationId);
     } catch (err) {
       if (seq === loadSeqRef.current) setError(err.message || 'Failed to load conversation');
