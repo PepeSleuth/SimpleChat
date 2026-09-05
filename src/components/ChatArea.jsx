@@ -9,9 +9,9 @@ import ReasoningAccordion from './ReasoningAccordion';
 
 const markdownRemarkPlugins = [
   remarkGfm,
-  [remarkMath, { singleDollarTextMath: false }],
+  [remarkMath, { singleDollarTextMath: true }],
 ];
-const markdownRehypePlugins = [rehypeKatex];
+const markdownRehypePlugins = [[rehypeKatex, { strict: false, throwOnError: false }]];
 
 export default function ChatArea({
   messages,

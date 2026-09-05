@@ -175,6 +175,19 @@ body {
   text-underline-offset: 2px;
 }
 
+/* KaTeX math: keep display equations readable on dark background */
+.markdown-body .katex {
+  color: #e6edf3;
+  font-size: 1.02em;
+}
+
+.markdown-body .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.35em 0;
+  margin: 0.9em 0;
+}
+
 /* Streaming cursor — pseudo-element can't be done with Tailwind */
 .streaming::after {
   content: '▌';
