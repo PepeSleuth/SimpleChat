@@ -191,15 +191,27 @@ function SidebarSettings({ settings, actions }) {
       >
         Change model
       </button>
-      <div className="flex flex-col gap-1 mt-[2px]">
-        <span className="text-[11px] text-[#8b949e] uppercase tracking-[0.05em]">Web search</span>
-        <button
-          type="button"
-          className={`m-0 py-1 px-2.5 text-xs border cursor-pointer capitalize ${settings.webSearchEnabled ? 'bg-[#f0f6fc] text-[#0d1117] border-[#f0f6fc]' : 'bg-transparent text-[#9da7b3] border-[#30363d] hover:border-[#8b949e] hover:text-[#f0f6fc]'}`}
-          onClick={actions.toggleWebSearch}
-        >
-          {settings.webSearchEnabled ? 'on' : 'off'}
-        </button>
+      <div className="flex gap-1 mt-[2px]">
+        <div className="flex-1 flex flex-col gap-1 min-w-0">
+          <span className="text-[11px] text-[#8b949e] uppercase tracking-[0.05em]">Web search</span>
+          <button
+            type="button"
+            className={`m-0 py-1 px-2.5 text-xs border cursor-pointer capitalize ${settings.webSearchEnabled ? 'bg-[#f0f6fc] text-[#0d1117] border-[#f0f6fc]' : 'bg-transparent text-[#9da7b3] border-[#30363d] hover:border-[#8b949e] hover:text-[#f0f6fc]'}`}
+            onClick={actions.toggleWebSearch}
+          >
+            {settings.webSearchEnabled ? 'on' : 'off'}
+          </button>
+        </div>
+        <div className="flex-1 flex flex-col gap-1 min-w-0">
+          <span className="text-[11px] text-[#8b949e] uppercase tracking-[0.05em]">LaTeX</span>
+          <button
+            type="button"
+            className={`m-0 py-1 px-2.5 text-xs border cursor-pointer capitalize ${(settings.mathEnabled ?? true) ? 'bg-[#f0f6fc] text-[#0d1117] border-[#f0f6fc]' : 'bg-transparent text-[#9da7b3] border-[#30363d] hover:border-[#8b949e] hover:text-[#f0f6fc]'}`}
+            onClick={actions.toggleMath}
+          >
+            {(settings.mathEnabled ?? true) ? 'on' : 'off'}
+          </button>
+        </div>
       </div>
       <div className="flex flex-col gap-1 mt-[2px]">
         <span className="text-[11px] text-[#8b949e] uppercase tracking-[0.05em]">Reasoning</span>

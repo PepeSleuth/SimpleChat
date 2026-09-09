@@ -7,11 +7,8 @@ import MessageStats from './MessageStats';
 import MessageAttachments from './MessageAttachments';
 import ReasoningAccordion from './ReasoningAccordion';
 
-const markdownRemarkPlugins = [
-  remarkGfm,
-  [remarkMath, { singleDollarTextMath: true }],
-];
-const markdownRehypePlugins = [[rehypeKatex, { strict: false, throwOnError: false }]];
+const mathRemarkPlugins = [[remarkMath, { singleDollarTextMath: true }]];
+const mathRehypePlugins = [[rehypeKatex, { strict: false, throwOnError: false }]];
 
 export default function ChatArea({
   messages,
@@ -20,6 +17,7 @@ export default function ChatArea({
   streamingText,
   streamingReasoningText,
   reasoningEffort,
+  mathEnabled = true,
   error,
   chatRef,
   onBranch,
@@ -27,6 +25,8 @@ export default function ChatArea({
   onCopy,
 }) {
   const actionButtonClass = 'py-[2px] px-[6px] text-xs bg-[#30363d] text-[#e6edf3] border-none rounded-[3px] cursor-pointer hover:bg-[#484f58]';
+  const markdownRemarkPlugins = mathEnabled ? [remarkGfm, ...mathRemarkPlugins] : [remarkGfm];
+  const markdownRehypePlugins = mathEnabled ? mathRehypePlugins : [];
 
   return (
     <div className="flex-1 overflow-y-auto p-5" ref={chatRef}>

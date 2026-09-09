@@ -82,6 +82,7 @@ export default function App() {
   const [modelPickerInput, setModelPickerInput] = useState('');
   const [reasoningEffort, setReasoningEffort] = useState(null);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [mathEnabled, setMathEnabled] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [yearAgoFilterDate, setYearAgoFilterDate] = useState(getDefaultYearAgoDate);
   const [searchResults, setSearchResults] = useState(null);
@@ -146,6 +147,7 @@ export default function App() {
         setMessages(hydrateMessages(state.messages));
         setReasoningEffort(state.settings.reasoningEffort ?? null);
         setWebSearchEnabled(Boolean(state.settings.webSearchEnabled));
+        setMathEnabled(state.settings.mathEnabled ?? true);
       } catch (err) {
         if (!cancelled) setError(err.message || 'Failed to load chats');
       } finally {
@@ -264,6 +266,7 @@ export default function App() {
     setSetting('model', nextModel);
     if (reasoningEffort !== null) setSetting('reasoningEffort', reasoningEffort);
     setSetting('webSearchEnabled', webSearchEnabled);
+    setSetting('mathEnabled', mathEnabled);
   }
 
   async function updateApiKey() {
@@ -300,6 +303,12 @@ export default function App() {
     const nextValue = !webSearchEnabled;
     setWebSearchEnabled(nextValue);
     setSetting('webSearchEnabled', nextValue);
+  }
+
+  function toggleMath() {
+    const nextValue = !mathEnabled;
+    setMathEnabled(nextValue);
+    setSetting('mathEnabled', nextValue);
   }
 
   function getProjectById(projectId) {
@@ -808,7 +817,7 @@ export default function App() {
           dateFilterValue: yearAgoFilterDate,
         }}
         conversations={{ items: conversations, filtered: filteredConversations, currentId: currentConversationId }}
-        settings={{ model, webSearchEnabled, reasoningEffort }}
+        settings={{ model, webSearchEnabled, mathEnabled, reasoningEffort }}
         actions={{
           newProject,
           selectProject: setSelectedProjectId,
@@ -825,6 +834,7 @@ export default function App() {
           updateApiKey,
           changeModel,
           toggleWebSearch,
+          toggleMath,
           setReasoningEffort: handleSetReasoningEffort,
           exportData: handleExport,
           importData: handleImport,
@@ -841,6 +851,7 @@ export default function App() {
           streamingText={streamingText}
           streamingReasoningText={streamingReasoningText}
           reasoningEffort={reasoningEffort}
+          mathEnabled={mathEnabled}
           error={error}
           chatRef={chatRef}
           onBranch={branchConversation}
