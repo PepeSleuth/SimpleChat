@@ -17,6 +17,7 @@ export default function ChatArea({
   streamingText,
   streamingReasoningText,
   streamingToolCalls,
+  requestStatus,
   reasoningEffort,
   mathEnabled = true,
   error,
@@ -56,6 +57,7 @@ export default function ChatArea({
             )}
             {msg.role === 'assistant' ? (
               <>
+                {msg.stats?.error && <div role="alert" className="mt-2 text-sm text-[#ff7b72]">Response incomplete: {msg.stats.error}</div>}
                 <MessageStats stats={msg.stats} createdAt={msg.createdAt} />
                 <div className="mt-1 flex items-center gap-[6px] invisible group-hover:visible">
                   <button
@@ -108,6 +110,7 @@ export default function ChatArea({
                 <div className="markdown-body">
                   <ReactMarkdown remarkPlugins={markdownRemarkPlugins} rehypePlugins={markdownRehypePlugins}>{streamingText}</ReactMarkdown>
                 </div>
+                {requestStatus && <div role="status" className="mt-2 text-sm text-[#8b949e]">{requestStatus}</div>}
                 <span className="streaming"></span>
               </>
             )}
@@ -116,7 +119,7 @@ export default function ChatArea({
       )}
 
       {error && (
-        <div className="mb-5">
+        <div role="alert" className="mb-5">
           <span className="text-[#ff7b72] font-bold">Error: {error}</span>
         </div>
       )}

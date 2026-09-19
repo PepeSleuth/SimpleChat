@@ -74,6 +74,7 @@ export default function App() {
   const [streamingText, setStreamingText] = useState('');
   const [streamingReasoningText, setStreamingReasoningText] = useState('');
   const [streamingToolCalls, setStreamingToolCalls] = useState([]);
+  const [requestStatus, setRequestStatus] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [isConversationLoading, setIsConversationLoading] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
@@ -254,9 +255,8 @@ export default function App() {
 
   function saveConfig() {
     const nextApiKey = apiKeyInput.trim();
-    const nextModel = modelInput.trim();
+    const nextModel = modelInput.trim() || DEFAULT_MODEL;
     if (!nextApiKey) { setError('Enter an API key'); return; }
-    if (!nextModel) { setError('Enter a model name'); return; }
 
     setError('');
     setApiKey(nextApiKey);
@@ -660,18 +660,27 @@ export default function App() {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const assistantResponse = await streamOpenRouterChat({
-      apiKey,
-      model,
-      messages: contextMessages,
-      conversationId,
-      reasoningEffort,
-      webSearchEnabled,
-      abortSignal: controller.signal,
-      onText: setStreamingText,
-      onReasoningText: setStreamingReasoningText,
-      onToolCalls: setStreamingToolCalls,
-    });
+    let responseError;
+    let assistantResponse;
+    try {
+      assistantResponse = await streamOpenRouterChat({
+        apiKey,
+        model,
+        messages: contextMessages,
+        conversationId,
+        reasoningEffort,
+        webSearchEnabled,
+        abortSignal: controller.signal,
+        onText: setStreamingText,
+        onReasoningText: setStreamingReasoningText,
+        onToolCalls: setStreamingToolCalls,
+        onStatus: setRequestStatus,
+      });
+    } catch (error) {
+      if (controller.signal.aborted || !error.partialResponse) throw error;
+      responseError = error;
+      assistantResponse = error.partialResponse;
+    }
     const assistantRecord = await appendMessage({
       conversationId,
       role: 'assistant',
@@ -687,6 +696,7 @@ export default function App() {
       createdAt: assistantRecord.createdAt,
       attachments: [],
     }]);
+    if (responseError) throw responseError;
   }
 
   async function sendMessage(text) {
@@ -765,11 +775,9 @@ export default function App() {
     return (
       <SetupScreen
         apiKeyInput={apiKeyInput}
-        modelInput={modelInput}
         webSearchEnabled={webSearchEnabled}
         error={error}
         onApiKeyChange={setApiKeyInput}
-        onModelChange={setModelInput}
         onToggleWebSearch={toggleWebSearch}
         onSave={saveConfig}
       />
@@ -820,6 +828,7 @@ export default function App() {
           streamingText={streamingText}
           streamingReasoningText={streamingReasoningText}
           streamingToolCalls={streamingToolCalls}
+          requestStatus={requestStatus}
           reasoningEffort={reasoningEffort}
           mathEnabled={mathEnabled}
           error={error}
