@@ -1,6 +1,7 @@
-import { streamText } from 'ai';
+import { streamText, stepCountIs } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { messagesToModelMessages, createOpenRouterTools } from './messageUtils';
+import { createConversationTools, historyInstructions } from './conversationTools';
 
 function getOpenRouterUsage(providerMeta) {
   const usage = providerMeta?.openrouter?.usage;
@@ -14,6 +15,7 @@ export async function streamOpenRouterChat({
   apiKey,
   model,
   messages,
+  conversationId,
   reasoningEffort,
   webSearchEnabled,
   abortSignal,
@@ -26,11 +28,17 @@ export async function streamOpenRouterChat({
     ...(reasoningEffort ? { extraBody: { reasoning: { effort: reasoningEffort } } } : {}),
   };
   const modelMessages = await messagesToModelMessages(messages);
-  const tools = webSearchEnabled ? createOpenRouterTools(openrouter) : undefined;
+  modelMessages.unshift({ role: 'system', content: historyInstructions });
+  const tools = {
+    ...createConversationTools(conversationId),
+    ...(webSearchEnabled ? createOpenRouterTools(openrouter) : {}),
+  };
   const result = streamText({
     model: openrouter(model, modelOptions),
     messages: modelMessages,
-    ...(tools ? { tools } : {}),
+    tools,
+    stopWhen: stepCountIs(6),
+    prepareStep: ({ stepNumber }) => stepNumber === 5 ? { toolChoice: 'none' } : {},
     abortSignal,
   });
 
@@ -43,12 +51,17 @@ export async function streamOpenRouterChat({
     } else if (chunk.type === 'reasoning-delta') {
       reasoningText += chunk.text;
       onReasoningText?.(reasoningText);
+    } else if (chunk.type === 'error') {
+      throw chunk.error;
     }
   }
 
-  const usage = await result.usage;
-  const providerMeta = await result.providerMetadata ?? await result.experimental_providerMetadata;
-  const openRouterUsage = getOpenRouterUsage(providerMeta);
+  const usage = await result.totalUsage;
+  const stepUsage = (await result.steps).map(step => getOpenRouterUsage(step.providerMetadata));
+  const sumUsage = key => {
+    const values = stepUsage.map(usage => usage[key]).filter(value => value != null);
+    return values.length ? values.reduce((sum, value) => sum + Number(value), 0) : null;
+  };
   const reasoningTokens = usage?.outputTokenDetails?.reasoningTokens ?? usage?.reasoningTokens ?? null;
 
   return {
@@ -59,11 +72,11 @@ export async function streamOpenRouterChat({
       reasoningEffort: reasoningEffort ?? null,
       reasoningTokens,
       reasoningText: reasoningText || null,
-      promptTokens: usage?.promptTokens,
-      completionTokens: usage?.completionTokens,
+      promptTokens: usage?.inputTokens,
+      completionTokens: usage?.outputTokens,
       totalTokens: usage?.totalTokens,
-      webSearchRequests: openRouterUsage.webSearchRequests,
-      cost: openRouterUsage.cost,
+      webSearchRequests: sumUsage('webSearchRequests'),
+      cost: sumUsage('cost'),
     },
   };
 }

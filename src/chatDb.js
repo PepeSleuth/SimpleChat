@@ -1,4 +1,5 @@
 import Dexie from 'dexie';
+import { rankConversations } from './lib/conversationSearch';
 
 const DEFAULT_PROJECT_NAME = 'Unsorted';
 
@@ -70,6 +71,33 @@ async function searchConversations(query) {
     : [];
 
   return [...byName, ...byMsg].sort((a, b) => b.id - a.id);
+}
+
+async function searchConversationHistory(queries, excludeConversationId) {
+  const [conversations, messages] = await Promise.all([
+    db.conversations.toArray(),
+    db.messages.toArray(),
+  ]);
+  return rankConversations(conversations, messages, queries, excludeConversationId);
+}
+
+async function readConversationHistory(conversationId, afterMessageId = 0) {
+  const conversation = await db.conversations.get(conversationId);
+  if (!conversation) return { error: 'Conversation no longer exists.' };
+  const messages = await db.messages.where('conversationId').equals(conversationId)
+    .filter(message => message.id > afterMessageId).sortBy('id');
+  const page = [];
+  let characters = 0;
+  for (const message of messages) {
+    if (page.length && (page.length >= 20 || characters + (message.text?.length ?? 0) > 24000)) break;
+    const text = (message.text ?? '').slice(0, 24000);
+    page.push({ messageId: message.id, role: message.role, text, truncated: text.length < (message.text?.length ?? 0) });
+    characters += text.length;
+  }
+  return {
+    title: conversation.name, url: `/chats/${conversation.id}`, messages: page,
+    nextAfterMessageId: page.length < messages.length ? page.at(-1).messageId : null,
+  };
 }
 
 async function ensureDefaultProject() {
@@ -468,6 +496,8 @@ export {
   renameConversation,
   renameProject,
   searchConversations,
+  searchConversationHistory,
+  readConversationHistory,
   setSetting,
   updateMessageText,
 };

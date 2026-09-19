@@ -687,6 +687,7 @@ export default function App() {
       apiKey,
       model,
       messages: contextMessages,
+      conversationId,
       reasoningEffort,
       webSearchEnabled,
       abortSignal: controller.signal,
