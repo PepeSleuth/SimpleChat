@@ -1,3 +1,4 @@
 - Always respond in English, unless explicitly prompted otherwise
 - I am aware that LLMs have a knowledge cutoff date, no need to remind me
 - Always use metric units
+- Never implicitly assume that I want you to use web search. Only use it if I tell you to research or look something up
