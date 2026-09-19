@@ -16,6 +16,7 @@ export default function ChatArea({
   isConversationLoading,
   streamingText,
   streamingReasoningText,
+  streamingToolCalls,
   reasoningEffort,
   mathEnabled = true,
   error,
@@ -103,7 +104,7 @@ export default function ChatArea({
           <div className="message-content text-base leading-[1.6]">
             {isConversationLoading ? 'Loading conversation...' : (
               <>
-                <ReasoningAccordion reasoningText={streamingReasoningText} reasoningEffort={reasoningEffort} />
+                <ReasoningAccordion reasoningText={streamingReasoningText} reasoningEffort={reasoningEffort} toolCalls={streamingToolCalls} />
                 <div className="markdown-body">
                   <ReactMarkdown remarkPlugins={markdownRemarkPlugins} rehypePlugins={markdownRehypePlugins}>{streamingText}</ReactMarkdown>
                 </div>

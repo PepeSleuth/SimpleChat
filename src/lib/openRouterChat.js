@@ -21,6 +21,7 @@ export async function streamOpenRouterChat({
   abortSignal,
   onText,
   onReasoningText,
+  onToolCalls,
 }) {
   const openrouter = createOpenRouter({ apiKey });
   const modelOptions = {
@@ -44,6 +45,7 @@ export async function streamOpenRouterChat({
 
   let text = '';
   let reasoningText = '';
+  const toolCalls = new Map();
   for await (const chunk of result.fullStream) {
     if (chunk.type === 'text-delta') {
       text += chunk.text;
@@ -51,6 +53,19 @@ export async function streamOpenRouterChat({
     } else if (chunk.type === 'reasoning-delta') {
       reasoningText += chunk.text;
       onReasoningText?.(reasoningText);
+    } else if (['tool-call', 'tool-result', 'tool-error'].includes(chunk.type)) {
+      const previous = toolCalls.get(chunk.toolCallId);
+      toolCalls.set(chunk.toolCallId, {
+        ...previous,
+        id: chunk.toolCallId,
+        name: chunk.toolName,
+        input: chunk.input ?? previous?.input,
+        status: chunk.type === 'tool-error' || chunk.invalid ? 'error'
+          : chunk.type === 'tool-result' && !chunk.preliminary ? 'complete' : 'running',
+        ...(chunk.type === 'tool-result' ? { output: chunk.output } : {}),
+        ...(chunk.error != null ? { error: chunk.error instanceof Error ? chunk.error.message : String(chunk.error) } : {}),
+      });
+      onToolCalls?.([...toolCalls.values()]);
     } else if (chunk.type === 'error') {
       throw chunk.error;
     }
@@ -72,6 +87,7 @@ export async function streamOpenRouterChat({
       reasoningEffort: reasoningEffort ?? null,
       reasoningTokens,
       reasoningText: reasoningText || null,
+      toolCalls: [...toolCalls.values()],
       promptTokens: usage?.inputTokens,
       completionTokens: usage?.outputTokens,
       totalTokens: usage?.totalTokens,

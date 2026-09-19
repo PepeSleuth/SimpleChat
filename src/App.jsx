@@ -74,6 +74,7 @@ export default function App() {
   const [pendingAttachments, setPendingAttachments] = useState([]);
   const [streamingText, setStreamingText] = useState('');
   const [streamingReasoningText, setStreamingReasoningText] = useState('');
+  const [streamingToolCalls, setStreamingToolCalls] = useState([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isConversationLoading, setIsConversationLoading] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
@@ -680,6 +681,7 @@ export default function App() {
   }
 
   async function appendAssistantResponse({ conversationId, contextMessages }) {
+    setStreamingToolCalls([]);
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -693,6 +695,7 @@ export default function App() {
       abortSignal: controller.signal,
       onText: setStreamingText,
       onReasoningText: setStreamingReasoningText,
+      onToolCalls: setStreamingToolCalls,
     });
     const assistantRecord = await appendMessage({
       conversationId,
@@ -722,6 +725,7 @@ export default function App() {
     setError('');
     setStreamingText('');
     setStreamingReasoningText('');
+    setStreamingToolCalls([]);
     setIsStreaming(true);
 
     try {
@@ -774,6 +778,7 @@ export default function App() {
       abortRef.current = null;
       setStreamingText('');
       setStreamingReasoningText('');
+      setStreamingToolCalls([]);
       setIsStreaming(false);
     }
   }
@@ -851,6 +856,7 @@ export default function App() {
           isConversationLoading={isConversationLoading}
           streamingText={streamingText}
           streamingReasoningText={streamingReasoningText}
+          streamingToolCalls={streamingToolCalls}
           reasoningEffort={reasoningEffort}
           mathEnabled={mathEnabled}
           error={error}
