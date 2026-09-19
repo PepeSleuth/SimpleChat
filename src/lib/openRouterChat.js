@@ -1,3 +1,5 @@
+import { createWebSearchActivity } from './webSearchActivity';
+import { enableYouTubeUrls } from './youtube';
 import { requestError, retryRequest } from './requestRetry';
 import { streamText, stepCountIs } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
@@ -27,7 +29,7 @@ async function streamAttempt({
   messages,
   conversationId,
   reasoningEffort,
-  webSearchEnabled,
+  youtubeEnabled,
   abortSignal,
   onText,
   onReasoningText,
@@ -38,15 +40,16 @@ async function streamAttempt({
     usage: { include: true },
     ...(reasoningEffort ? { extraBody: { reasoning: { effort: reasoningEffort } } } : {}),
   };
-  const modelMessages = await messagesToModelMessages(messages);
+  const modelMessages = await messagesToModelMessages(messages, { youtubeEnabled });
   modelMessages.unshift({ role: 'system', content: historyInstructions });
   const tools = {
     ...createConversationTools(conversationId),
-    ...(webSearchEnabled ? createOpenRouterTools(openrouter) : {}),
+    ...createOpenRouterTools(openrouter),
   };
   let streamError;
   const result = streamText({
-    model: openrouter(model, modelOptions),
+    model: enableYouTubeUrls(openrouter(model, modelOptions)),
+    includeRawChunks: true,
     messages: modelMessages,
     tools,
     stopWhen: stepCountIs(6),
@@ -60,8 +63,14 @@ async function streamAttempt({
   let text = '';
   let reasoningText = '';
   const toolCalls = new Map();
+  const webSearchActivity = createWebSearchActivity();
   try {
     for await (const chunk of result.fullStream) {
+      const webActivity = webSearchActivity.consume(chunk);
+      if (webActivity) {
+        toolCalls.set(webActivity.id, webActivity);
+        onToolCalls?.([...toolCalls.values()]);
+      }
       if (chunk.type === 'text-delta') {
         text += chunk.text;
         onText(text);
@@ -124,7 +133,7 @@ async function streamAttempt({
       promptTokens: usage?.inputTokens,
       completionTokens: usage?.outputTokens,
       totalTokens: usage?.totalTokens,
-      webSearchRequests: sumUsage('webSearchRequests'),
+      webSearchRequests: webSearchActivity.totalRequests ?? sumUsage('webSearchRequests'),
       cost: sumUsage('cost'),
     },
   };

@@ -82,8 +82,8 @@ export default function App() {
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [modelPickerInput, setModelPickerInput] = useState('');
   const [reasoningEffort, setReasoningEffort] = useState(null);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
-  const [mathEnabled, setMathEnabled] = useState(true);
+  const [youtubeEnabled, setYoutubeEnabled] = useState(false);
+  const [mathEnabled, setMathEnabled] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [yearAgoFilterDate, setYearAgoFilterDate] = useState(getDefaultYearAgoDate);
   const [searchResults, setSearchResults] = useState(null);
@@ -147,8 +147,6 @@ export default function App() {
         setCurrentConversationId(state.currentConversationId);
         setMessages(hydrateMessages(state.messages));
         setReasoningEffort(state.settings.reasoningEffort ?? null);
-        setWebSearchEnabled(Boolean(state.settings.webSearchEnabled));
-        setMathEnabled(state.settings.mathEnabled ?? true);
       } catch (err) {
         if (!cancelled) setError(err.message || 'Failed to load chats');
       } finally {
@@ -265,8 +263,6 @@ export default function App() {
     setSetting('apiKey', nextApiKey);
     setSetting('model', nextModel);
     if (reasoningEffort !== null) setSetting('reasoningEffort', reasoningEffort);
-    setSetting('webSearchEnabled', webSearchEnabled);
-    setSetting('mathEnabled', mathEnabled);
   }
 
   async function updateApiKey() {
@@ -299,16 +295,14 @@ export default function App() {
     setShowModelPicker(false);
   }
 
-  function toggleWebSearch() {
-    const nextValue = !webSearchEnabled;
-    setWebSearchEnabled(nextValue);
-    setSetting('webSearchEnabled', nextValue);
+  function toggleYoutube() {
+    const nextValue = !youtubeEnabled;
+    setYoutubeEnabled(nextValue);
   }
 
   function toggleMath() {
     const nextValue = !mathEnabled;
     setMathEnabled(nextValue);
-    setSetting('mathEnabled', nextValue);
   }
 
   function getProjectById(projectId) {
@@ -669,7 +663,7 @@ export default function App() {
         messages: contextMessages,
         conversationId,
         reasoningEffort,
-        webSearchEnabled,
+        youtubeEnabled,
         abortSignal: controller.signal,
         onText: setStreamingText,
         onReasoningText: setStreamingReasoningText,
@@ -775,10 +769,8 @@ export default function App() {
     return (
       <SetupScreen
         apiKeyInput={apiKeyInput}
-        webSearchEnabled={webSearchEnabled}
         error={error}
         onApiKeyChange={setApiKeyInput}
-        onToggleWebSearch={toggleWebSearch}
         onSave={saveConfig}
       />
     );
@@ -795,7 +787,7 @@ export default function App() {
           dateFilterValue: yearAgoFilterDate,
         }}
         conversations={{ items: conversations, filtered: filteredConversations, currentId: currentConversationId }}
-        settings={{ model, webSearchEnabled, mathEnabled, reasoningEffort }}
+        settings={{ model, youtubeEnabled, mathEnabled, reasoningEffort }}
         actions={{
           newProject,
           selectProject: setSelectedProjectId,
@@ -810,7 +802,7 @@ export default function App() {
           deleteConversation,
           updateApiKey,
           changeModel,
-          toggleWebSearch,
+          toggleYoutube,
           toggleMath,
           setReasoningEffort: handleSetReasoningEffort,
           exportData: handleExport,

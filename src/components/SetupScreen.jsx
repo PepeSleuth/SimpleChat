@@ -1,9 +1,7 @@
 export default function SetupScreen({
   apiKeyInput,
-  webSearchEnabled,
   error,
   onApiKeyChange,
-  onToggleWebSearch,
   onSave,
 }) {
   return (

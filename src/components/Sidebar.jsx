@@ -186,23 +186,28 @@ function SidebarSettings({ settings, actions }) {
       </button>
       <div className="flex gap-1 mt-[2px]">
         <div className="flex-1 flex flex-col gap-1 min-w-0">
-          <span className="text-[11px] text-[#8b949e] uppercase tracking-[0.05em]">Web search</span>
+          <span className="text-[11px] text-[#8b949e] uppercase tracking-[0.05em]">YouTube</span>
           <button
             type="button"
-            className={`m-0 py-1 px-2.5 text-xs border cursor-pointer capitalize ${settings.webSearchEnabled ? 'bg-[#f0f6fc] text-[#0d1117] border-[#f0f6fc]' : 'bg-transparent text-[#9da7b3] border-[#30363d] hover:border-[#8b949e] hover:text-[#f0f6fc]'}`}
-            onClick={actions.toggleWebSearch}
+            className={`m-0 py-1 px-2.5 text-xs border cursor-pointer capitalize ${settings.youtubeEnabled ? 'bg-[#f0f6fc] text-[#0d1117] border-[#f0f6fc]' : 'bg-transparent text-[#9da7b3] border-[#30363d] hover:border-[#8b949e] hover:text-[#f0f6fc]'}`}
+            aria-label="Send YouTube links as video"
+            aria-pressed={Boolean(settings.youtubeEnabled)}
+            title="Send YouTube links in your latest message as video. Requires a video-capable model."
+            onClick={actions.toggleYoutube}
           >
-            {settings.webSearchEnabled ? 'on' : 'off'}
+            {settings.youtubeEnabled ? 'on' : 'off'}
           </button>
         </div>
         <div className="flex-1 flex flex-col gap-1 min-w-0">
           <span className="text-[11px] text-[#8b949e] uppercase tracking-[0.05em]">LaTeX</span>
           <button
             type="button"
-            className={`m-0 py-1 px-2.5 text-xs border cursor-pointer capitalize ${(settings.mathEnabled ?? true) ? 'bg-[#f0f6fc] text-[#0d1117] border-[#f0f6fc]' : 'bg-transparent text-[#9da7b3] border-[#30363d] hover:border-[#8b949e] hover:text-[#f0f6fc]'}`}
+            className={`m-0 py-1 px-2.5 text-xs border cursor-pointer capitalize ${(settings.mathEnabled ?? false) ? 'bg-[#f0f6fc] text-[#0d1117] border-[#f0f6fc]' : 'bg-transparent text-[#9da7b3] border-[#30363d] hover:border-[#8b949e] hover:text-[#f0f6fc]'}`}
+            aria-label="Render LaTeX"
+            aria-pressed={Boolean(settings.mathEnabled)}
             onClick={actions.toggleMath}
           >
-            {(settings.mathEnabled ?? true) ? 'on' : 'off'}
+            {(settings.mathEnabled ?? false) ? 'on' : 'off'}
           </button>
         </div>
       </div>

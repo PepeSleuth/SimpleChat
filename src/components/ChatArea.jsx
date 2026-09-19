@@ -19,7 +19,7 @@ export default function ChatArea({
   streamingToolCalls,
   requestStatus,
   reasoningEffort,
-  mathEnabled = true,
+  mathEnabled = false,
   error,
   chatRef,
   onBranch,

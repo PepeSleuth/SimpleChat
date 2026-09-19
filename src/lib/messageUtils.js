@@ -1,3 +1,4 @@
+import { youtubeVideoParts } from './youtube';
 import { attachmentToPart } from './attachments';
 import customInstructions from '../../data/custom_instructions.txt?raw';
 
@@ -10,7 +11,7 @@ export function formatCost(cost) {
   return `$${value.toFixed(4)}`;
 }
 
-export async function messagesToModelMessages(messages) {
+export async function messagesToModelMessages(messages, { youtubeEnabled = false } = {}) {
   const modelMessages = [];
   const instructions = customInstructions.trim();
 
@@ -18,6 +19,7 @@ export async function messagesToModelMessages(messages) {
     modelMessages.push({ role: 'system', content: instructions });
   }
 
+  const latestUserMessage = messages.findLast(message => message.role === 'user');
   for (const message of messages) {
     if (message.role === 'assistant') {
       modelMessages.push({ role: 'assistant', content: message.text ?? '' });
@@ -28,6 +30,8 @@ export async function messagesToModelMessages(messages) {
     if (message.text) {
       parts.push({ type: 'text', text: message.text });
     }
+
+    if (message === latestUserMessage) parts.push(...youtubeVideoParts(message.text, youtubeEnabled));
 
     const attachmentParts = await Promise.all((message.attachments ?? []).map(attachmentToPart));
     parts.push(...attachmentParts);
