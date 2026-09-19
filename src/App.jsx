@@ -16,7 +16,6 @@ import {
   loadAppState,
   loadConversationMessages,
   moveConversationToProject as moveConversationToProjectRecord,
-  renameConversation as renameConversationRecord,
   renameProject as renameProjectRecord,
   searchConversations,
   setSetting,
@@ -389,24 +388,6 @@ export default function App() {
     }
   }
 
-  async function renameConversation(conv) {
-    const newName = await promptText({
-      title: 'Rename conversation',
-      initialValue: conv.name,
-      submitLabel: 'Rename',
-    });
-    if (!newName?.trim() || newName.trim() === conv.name) return;
-
-    try {
-      const updated = await renameConversationRecord(conv.id, newName.trim());
-      if (updated) {
-        setConversations(prev => prev.map(c => (c.id === conv.id ? updated : c)));
-      }
-    } catch (err) {
-      setError(err.message || 'Failed to rename conversation');
-    }
-  }
-
   async function renameProject(project) {
     if (project.isDefault) return;
 
@@ -511,16 +492,10 @@ export default function App() {
     if (!currentConv || isStreaming || isConversationLoading) return;
 
     const branchMessages = messages.slice(0, messageIndex + 1);
-    const branchName = await promptText({
-      title: 'Branch conversation',
-      initialValue: `${currentConv.name} (Branch)`,
-      submitLabel: 'Branch',
-    });
-    if (!branchName?.trim()) return;
 
     try {
       const branch = await duplicateConversationFromMessages({
-        name: branchName.trim(),
+        name: currentConv.name,
         messages: branchMessages,
         projectId: currentConv.projectId,
       });
@@ -752,18 +727,7 @@ export default function App() {
 
       setMessages(prev => [...prev, userMessage]);
 
-      if (draftMessages.length === 0 && text) {
-        try {
-          const updatedConversation = await renameConversationRecord(currentConversationId, text);
-          if (updatedConversation) {
-            setConversations(prev => prev.map(conv => (
-              conv.id === currentConversationId ? updatedConversation : conv
-            )));
-          }
-        } catch (renameErr) {
-          console.error('Failed to auto-title conversation from first message', renameErr);
-        }
-      }
+      setConversations(await listConversations());
 
       consumePendingAttachments();
       await appendAssistantResponse({
@@ -835,7 +799,6 @@ export default function App() {
           openConversation,
           canOpenConversation: !isStreaming && !isConversationLoading,
           moveConversation,
-          renameConversation,
           deleteConversation,
           updateApiKey,
           changeModel,

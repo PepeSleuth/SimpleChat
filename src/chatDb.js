@@ -1,4 +1,5 @@
 import Dexie from 'dexie';
+import { conversationTitle } from './lib/conversationTitle';
 import { rankConversations } from './lib/conversationSearch';
 
 const DEFAULT_PROJECT_NAME = 'Unsorted';
@@ -26,6 +27,26 @@ db.version(2).stores({
     .filter(conv => conv.projectId == null)
     .modify({ projectId: defaultProjectId, updatedAt: now });
 });
+
+// Apply the same title rule to chats saved before automatic titles were introduced.
+db.version(3).stores({}).upgrade(async tx => {
+  const conversations = await tx.table('conversations').toArray();
+  for (const conversation of conversations) {
+    const messages = await tx.table('messages').where('conversationId').equals(conversation.id).sortBy('id');
+    await tx.table('conversations').update(conversation.id, {
+      name: conversationTitle(messages, conversation.name),
+    });
+  }
+});
+
+async function refreshConversationTitle(conversationId, now) {
+  const conversation = await db.conversations.get(conversationId);
+  if (!conversation) return;
+  const messages = await db.messages.where('conversationId').equals(conversationId).sortBy('id');
+  await db.conversations.put({
+    ...conversation, name: conversationTitle(messages, conversation.name), updatedAt: now,
+  });
+}
 
 async function getDefaultProject() {
   return (await db.projects.filter(p => p.isDefault).first()) ?? null;
@@ -170,16 +191,6 @@ async function createConversation(name, projectId = null) {
   return { id, ...conversation };
 }
 
-async function renameConversation(conversationId, name) {
-  return db.transaction('rw', db.conversations, async () => {
-    const conversation = await db.conversations.get(conversationId);
-    if (!conversation) return null;
-    const updated = { ...conversation, name, updatedAt: new Date().toISOString() };
-    await db.conversations.put(updated);
-    return updated;
-  });
-}
-
 async function deleteConversation(conversationId) {
   await db.transaction('rw', [db.conversations, db.messages, db.attachments], async () => {
     await db.attachments.where('conversationId').equals(conversationId).delete();
@@ -236,7 +247,7 @@ async function appendMessage({ conversationId, role, text, stats = null, attachm
 
     const conversation = await db.conversations.get(conversationId);
     if (conversation) {
-      await db.conversations.put({ ...conversation, updatedAt: now });
+      await db.conversations.put({ ...conversation, ...(role === 'user' ? { name: conversationTitle([{ role, text }]) } : {}), updatedAt: now });
     }
 
     return { id: messageId, conversationId, role, text, stats, createdAt: now };
@@ -252,10 +263,7 @@ async function updateMessageText(messageId, text) {
     const updatedMessage = { ...message, text };
     await db.messages.put(updatedMessage);
 
-    const conversation = await db.conversations.get(message.conversationId);
-    if (conversation) {
-      await db.conversations.put({ ...conversation, updatedAt: now });
-    }
+    await refreshConversationTitle(message.conversationId, now);
 
     return updatedMessage;
   });
@@ -276,16 +284,14 @@ async function deleteMessagesAfter(conversationId, messageId) {
       await db.messages.bulkDelete(messageIds);
     }
 
-    const conversation = await db.conversations.get(conversationId);
-    if (conversation) {
-      await db.conversations.put({ ...conversation, updatedAt: now });
-    }
+    await refreshConversationTitle(conversationId, now);
 
     return messageIds;
   });
 }
 
 async function duplicateConversationFromMessages({ name, messages, projectId = null }) {
+  name = conversationTitle(messages, name);
   const now = new Date().toISOString();
   const targetProjectId = projectId ?? (await ensureDefaultProject()).id;
 
@@ -454,7 +460,7 @@ async function importAllData(data) {
       for (const convData of projectData.conversations ?? []) {
         const now = new Date().toISOString();
         const conversationId = await db.conversations.add({
-          name: convData.name,
+          name: conversationTitle(convData.messages ?? [], convData.name),
           projectId,
           createdAt: convData.createdAt ?? now,
           updatedAt: convData.updatedAt ?? now,
@@ -493,7 +499,6 @@ export {
   listConversations,
   listProjects,
   moveConversationToProject,
-  renameConversation,
   renameProject,
   searchConversations,
   searchConversationHistory,

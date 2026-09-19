@@ -158,13 +158,6 @@ function ConversationList({ projects, conversations, actions }) {
                   Move
                 </button>
                 <button
-                  className={`${convActionBase} hover:bg-white/15`}
-                  title="Rename"
-                  onClick={e => { e.stopPropagation(); actions.renameConversation(conv); }}
-                >
-                  Edit
-                </button>
-                <button
                   className={`${convActionBase} hover:bg-[#da3633] hover:text-white hover:border-[#da3633] disabled:opacity-25 disabled:cursor-not-allowed`}
                   title="Delete"
                   disabled={conversations.items.length <= 1}
