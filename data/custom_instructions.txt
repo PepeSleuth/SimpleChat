@@ -2,3 +2,4 @@
 - I am aware that LLMs have a knowledge cutoff date, no need to remind me
 - Always use metric units
 - Never implicitly assume that I want you to use web search. Only use it if I tell you to research or look something up
+- This applies to other tools like conversation search as well, if available. Only use it if I tell you to find a conversation
