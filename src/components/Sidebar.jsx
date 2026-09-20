@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 const convActionBase = 'm-0 py-[2px] px-[5px] text-xs bg-transparent text-inherit border border-current cursor-pointer opacity-70 rounded-[3px] hover:opacity-100';
@@ -121,54 +121,107 @@ function ProjectList({ projects, actions }) {
 }
 
 function ConversationList({ projects, conversations, actions }) {
+  const viewportRef = useRef(null);
+  const [viewport, setViewport] = useState({ top: 0, height: 0 });
+  const [focusedId, setFocusedId] = useState(null);
+  const rowHeight = projects.isSearching ? 47 : 38;
+  const count = conversations.filtered.length;
+
+  useLayoutEffect(() => {
+    const element = viewportRef.current;
+    const measure = () => setViewport({ top: element.scrollTop, height: element.clientHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
+    viewportRef.current.scrollTop = 0;
+    setViewport(previous => ({ ...previous, top: 0 }));
+  }, [projects.selected?.id, projects.dateFilterValue, projects.isSearching]);
+
+  // Keep a few extra rows mounted above and below the viewport.
+  const top = Math.min(viewport.top, Math.max(0, count * rowHeight - viewport.height));
+  const start = Math.max(0, Math.floor(top / rowHeight) - 6);
+  const end = Math.min(count, Math.ceil((top + viewport.height) / rowHeight) + 6);
+  const indices = new Set(Array.from({ length: end - start }, (_, index) => start + index));
+  // Preserve focus when scrolling, plus adjacent rows for uninterrupted Tab navigation.
+  const focusedIndex = useMemo(
+    () => focusedId == null ? -1 : conversations.filtered.findIndex(conv => conv.id === focusedId),
+    [conversations.filtered, focusedId],
+  );
+  if (focusedIndex >= 0) {
+    for (let index = Math.max(0, focusedIndex - 1); index <= Math.min(count - 1, focusedIndex + 1); index++) {
+      indices.add(index);
+    }
+  }
+
   return (
-    <nav className="flex-1 overflow-y-auto py-1">
+    <nav
+      ref={viewportRef}
+      aria-label="Conversations"
+      className="flex-1 min-h-0 overflow-y-auto py-1"
+      onScroll={event => {
+        const element = event.currentTarget;
+        setViewport({ top: element.scrollTop, height: element.clientHeight });
+      }}
+      onBlur={event => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocusedId(null);
+      }}
+    >
       {conversations.filtered.length === 0 ? (
         <div className="py-[10px] px-3 text-[#6e7681] text-[13px] italic">
           {projects.isSearching ? 'No matches found' : 'No conversations yet'}
         </div>
       ) : (
-        conversations.filtered.map(conv => {
-          const isActive = conv.id === conversations.currentId;
-          return (
-            <div
-              key={conv.id}
-              className={`group flex items-center justify-between py-2 px-3 select-none gap-[6px] ${isActive ? 'bg-[#f0f6fc] text-[#0d1117]' : 'hover:bg-[#161b22]'}`}
-            >
-              <Link
-                to={`/chats/${conv.id}`}
-                className="flex-1 overflow-hidden min-w-0 text-inherit no-underline"
-                onClick={e => {
-                  if (actions.canOpenConversation === false) e.preventDefault();
-                }}
+        <div className="relative" style={{ height: count * rowHeight }}>
+          {[...indices].sort((a, b) => a - b).map(index => {
+            const conv = conversations.filtered[index];
+            const isActive = conv.id === conversations.currentId;
+            return (
+              <div
+                key={conv.id}
+                style={{ position: 'absolute', top: index * rowHeight, height: rowHeight, width: '100%' }}
+                onFocus={() => setFocusedId(conv.id)}
+                className={`group flex items-center justify-between py-2 px-3 select-none gap-[6px] ${isActive ? 'bg-[#f0f6fc] text-[#0d1117]' : 'hover:bg-[#161b22]'}`}
               >
-                <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm">{conv.name}</span>
-                {projects.isSearching && (
-                  <span className="block text-[10px] overflow-hidden text-ellipsis whitespace-nowrap leading-none mt-[1px] opacity-50">
-                    {projects.items.find(p => p.id === conv.projectId)?.name ?? ''}
-                  </span>
-                )}
-              </Link>
-              <span className={`gap-[2px] shrink-0 ${isActive ? 'flex' : 'hidden group-hover:flex'}`}>
-                <button
-                  className={`${convActionBase} hover:bg-white/15`}
-                  title="Move"
-                  onClick={e => { e.stopPropagation(); actions.moveConversation(conv); }}
+                <Link
+                  to={`/chats/${conv.id}`}
+                  aria-current={isActive ? 'page' : undefined}
+                  className="flex-1 overflow-hidden min-w-0 text-inherit no-underline"
+                  onClick={e => {
+                    if (actions.canOpenConversation === false) e.preventDefault();
+                  }}
                 >
-                  Move
-                </button>
-                <button
-                  className={`${convActionBase} hover:bg-[#da3633] hover:text-white hover:border-[#da3633] disabled:opacity-25 disabled:cursor-not-allowed`}
-                  title="Delete"
-                  disabled={conversations.items.length <= 1}
-                  onClick={e => { e.stopPropagation(); actions.deleteConversation(conv); }}
-                >
-                  x
-                </button>
-              </span>
-            </div>
-          );
-        })
+                  <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm">{conv.name}</span>
+                  {projects.isSearching && (
+                    <span className="block text-[10px] overflow-hidden text-ellipsis whitespace-nowrap leading-none mt-[1px] opacity-50">
+                      {projects.items.find(p => p.id === conv.projectId)?.name ?? ''}
+                    </span>
+                  )}
+                </Link>
+                <span className={`gap-[2px] shrink-0 ${isActive ? 'flex' : 'hidden group-hover:flex group-focus-within:flex'}`}>
+                  <button
+                    className={`${convActionBase} hover:bg-white/15`}
+                    title="Move"
+                    onClick={e => { e.stopPropagation(); actions.moveConversation(conv); }}
+                  >
+                    Move
+                  </button>
+                  <button
+                    className={`${convActionBase} hover:bg-[#da3633] hover:text-white hover:border-[#da3633] disabled:opacity-25 disabled:cursor-not-allowed`}
+                    title="Delete"
+                    disabled={conversations.items.length <= 1}
+                    onClick={e => { e.stopPropagation(); actions.deleteConversation(conv); }}
+                  >
+                    x
+                  </button>
+                </span>
+              </div>
+            );
+          })}
+        </div>
       )}
     </nav>
   );

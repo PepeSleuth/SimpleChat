@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import modelsRaw from '../data/models.txt?raw';
 import {
@@ -117,12 +117,13 @@ export default function App() {
     ? yearAgoFilterProject
     : projects.find(p => p.id === selectedProjectId) ?? projects[0] ?? null;
   const selectedProjectIsDateFilter = selectedProject?.id === YEAR_AGO_FILTER_ID;
-  const filteredConversations = (searchResults !== null
+  const filteredConversations = useMemo(() => (searchResults !== null
     ? searchResults
     : selectedProjectIsDateFilter
       ? conversations.filter(c => isConversationOnDate(c, yearAgoFilterDate))
       : conversations.filter(c => c.projectId === selectedProject?.id)
-  ).slice().sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  ).slice().sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)),
+  [searchResults, conversations, selectedProjectIsDateFilter, selectedProject?.id, yearAgoFilterDate]);
   const routeConversationId = /^\d+$/.test(conversationIdParam ?? '')
     ? Number(conversationIdParam)
     : null;
