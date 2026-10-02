@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { streamText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { youtubeVideoParts, enableYouTubeUrls } from './youtube.js';
+import { youtubeVideoParts, enableYouTubeUrls, hasYouTubeVideo, youtubeProviderRouting } from './youtube.js';
 import { createWebSearchActivity } from './webSearchActivity.js';
 
 const id = 'dQw4w9WgXcQ';
@@ -21,6 +21,11 @@ test('unrelated, spoofed, channel, and invalid URLs are not video attachments', 
   assert.deepEqual(youtubeVideoParts(`https://youtube.com.evil.test/watch?v=${id} https://youtube.com/@channel https://youtube.com/watch?v=bad https://example.com/${id}`, true), []);
 });
 
+test('only requests with YouTube videos are pinned to AI Studio', () => {
+  assert.equal(hasYouTubeVideo([{ role: 'user', content: [{ type: 'text', text: url }] }]), false);
+  assert.equal(hasYouTubeVideo([{ role: 'system', content: 'hi' }, { role: 'user', content: youtubeVideoParts(url, true) }]), true);
+});
+
 test('SDK sends video_url without downloading YouTube and exposes server search activity', async () => {
   let body;
   let calls = 0;
@@ -34,7 +39,7 @@ test('SDK sends video_url without downloading YouTube and exposes server search 
     return new Response(chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
   } });
   const result = streamText({
-    model: enableYouTubeUrls(router('google/test')),
+    model: enableYouTubeUrls(router('google/test', { extraBody: { provider: youtubeProviderRouting } })),
     messages: [{ role: 'user', content: [{ type: 'text', text: url }, ...youtubeVideoParts(url, true)] }],
     tools: { web_search: router.tools.webSearch({}) },
     includeRawChunks: true,
@@ -48,6 +53,7 @@ test('SDK sends video_url without downloading YouTube and exposes server search 
   }
   assert.equal(calls, 1);
   assert.deepEqual(body.messages[0].content[1], { type: 'video_url', video_url: { url } });
+  assert.deepEqual(body.provider, { only: ['google-ai-studio'], allow_fallbacks: false });
   assert.ok(body.tools.some(tool => tool.type === 'openrouter:web_search'));
   assert.equal(search.status, 'complete');
   assert.equal(search.output.sources[0].url, 'https://example.com');

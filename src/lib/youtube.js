@@ -29,3 +29,12 @@ export function enableYouTubeUrls(model) {
   };
   return model;
 }
+
+// Only Google AI Studio accepts YouTube URLs; Vertex rejects video URLs, so
+// requests containing one must not be load-balanced onto it.
+export const youtubeProviderRouting = { only: ['google-ai-studio'], allow_fallbacks: false };
+
+export function hasYouTubeVideo(messages) {
+  return messages.some(message => Array.isArray(message.content) && message.content.some(part =>
+    part.type === 'file' && part.data instanceof URL && part.data.hostname === 'www.youtube.com'));
+}

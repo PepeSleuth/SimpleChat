@@ -1,5 +1,5 @@
 import { createWebSearchActivity } from './webSearchActivity';
-import { enableYouTubeUrls } from './youtube';
+import { enableYouTubeUrls, hasYouTubeVideo, youtubeProviderRouting } from './youtube';
 import { requestError, retryRequest } from './requestRetry';
 import { streamText, stepCountIs } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
@@ -36,11 +36,15 @@ async function streamAttempt({
   onToolCalls,
 }) {
   const openrouter = createOpenRouter({ apiKey });
+  const modelMessages = await messagesToModelMessages(messages, { youtubeEnabled });
+  const extraBody = {
+    ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
+    ...(hasYouTubeVideo(modelMessages) ? { provider: youtubeProviderRouting } : {}),
+  };
   const modelOptions = {
     usage: { include: true },
-    ...(reasoningEffort ? { extraBody: { reasoning: { effort: reasoningEffort } } } : {}),
+    ...(Object.keys(extraBody).length ? { extraBody } : {}),
   };
-  const modelMessages = await messagesToModelMessages(messages, { youtubeEnabled });
   modelMessages.unshift({ role: 'system', content: historyInstructions });
   const tools = {
     ...createConversationTools(conversationId),
